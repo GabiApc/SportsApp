@@ -41,7 +41,7 @@ export const TeamsSection: React.FC<TeamsSectionProps> = ({
   onPressTeam,
   onToggleFavorite,
 }) => {
-  const { colorScheme, toggleTheme } = useTheme();
+  const { colorScheme } = useTheme();
   const isDarkMode = colorScheme === "dark";
   const theme = isDarkMode ? Colors.dark : Colors.light;
 

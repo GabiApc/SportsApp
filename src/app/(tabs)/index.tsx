@@ -57,7 +57,7 @@ const initialTeams: Team[] = [
 ];
 
 export default function Index() {
-  const { colorScheme, toggleTheme } = useTheme();
+  const { colorScheme } = useTheme();
   const isDarkMode = colorScheme === "dark";
   const theme = isDarkMode ? Colors.dark : Colors.light;
 

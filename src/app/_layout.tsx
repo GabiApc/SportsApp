@@ -66,12 +66,15 @@ export default function RootLayout() {
     <PaperProvider theme={paperTheme}>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : LightTheme}>
         <Stack>
+          <Stack.Screen name="details" options={{ headerShown: false }} />
+
           <Stack.Screen
             name="(tabs)"
             options={{
               headerShown: false,
             }}
           />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         </Stack>
       </ThemeProvider>
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />

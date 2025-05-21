@@ -6,7 +6,7 @@ import { useTheme } from "@/src/hooks/useTheme";
 import { StyleSheet, TouchableWithoutFeedback, View } from "react-native";
 
 export default function TabLayout() {
-  const { colorScheme, toggleTheme } = useTheme();
+  const { colorScheme } = useTheme();
   const isDarkMode = colorScheme === "dark";
   const theme = isDarkMode ? Colors.dark : Colors.light;
   const styles = StyleSheet.create({

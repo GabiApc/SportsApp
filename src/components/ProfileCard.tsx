@@ -17,12 +17,12 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   email,
   onEditPress,
 }) => {
-  const { colorScheme, toggleTheme } = useTheme();
+  const { colorScheme } = useTheme();
   const isDarkMode = colorScheme === "dark";
   const theme = isDarkMode ? Colors.dark : Colors.light;
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.background }]}>
+    <View style={[styles.card, { backgroundColor: theme.backgroundSecondary }]}>
       {/* avatar */}
       <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
         <Feather name="user" size={24} color={theme.onSurface} />

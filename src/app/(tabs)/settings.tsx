@@ -1,12 +1,15 @@
 // src/components/SettingsSection.tsx
 import { ConfirmationModal } from "@/src/components/ConfirmationModal";
+import EditUserModal from "@/src/components/EditUserModal";
 import Header from "@/src/components/Header";
 import ProfileCard from "@/src/components/ProfileCard";
 import { useTheme } from "@/src/hooks/useTheme";
 import { Colors } from "@/src/theme/colors";
 import { typography } from "@/src/theme/typography";
 import { Feather } from "@expo/vector-icons";
-import React from "react";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
+
 import { Platform, StyleSheet, Switch, Text, View } from "react-native";
 
 export default function SettingsSection() {
@@ -15,6 +18,25 @@ export default function SettingsSection() {
   const theme = isDarkMode ? Colors.dark : Colors.light;
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = React.useState(false);
+  const [editVisible, setEditVisible] = useState(false);
+  const [name, setName] = useState("Mihai Crăciun");
+  const [email, setEmail] = useState("mihai.craciun@gmail.com");
+
+  const openEdit = () => setEditVisible(true);
+  const closeEdit = () => setEditVisible(false);
+
+  const handleSave = (newName: string, newEmail: string) => {
+    setName(newName);
+    setEmail(newEmail);
+    closeEdit();
+  };
+
+  const router = useRouter();
+  const handleLogout = () => {
+    // logică de logout
+    setLogoutModalVisible(false);
+    router.replace("/login");
+  };
 
   const styles = StyleSheet.create({
     container: {
@@ -95,7 +117,14 @@ export default function SettingsSection() {
           // logică de logout
           setLogoutModalVisible(false);
         }}
-        onCancel={() => setLogoutModalVisible(false)}
+        onCancel={() => handleLogout()}
+      />
+      <EditUserModal
+        visible={editVisible}
+        initialName={name}
+        initialEmail={email}
+        onSave={handleSave}
+        onCancel={closeEdit}
       />
       <Header
         onProfilePress={() => setLogoutModalVisible(true)}
@@ -106,7 +135,7 @@ export default function SettingsSection() {
       <ProfileCard
         name="Mihai Crăciun"
         email="mihaicraciun@gmail.com"
-        onEditPress={() => console.log("Edit profile")}
+        onEditPress={() => setEditVisible(true)}
       />
       <View style={styles.settings}>
         <Text style={[styles.header, { color: theme.onBackground }]}>

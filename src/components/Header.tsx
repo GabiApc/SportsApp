@@ -26,7 +26,7 @@ const Header: React.FC<HeaderProps> = ({
   showSearch = true,
   iconName,
 }) => {
-  const { colorScheme, toggleTheme } = useTheme();
+  const { colorScheme } = useTheme();
   const isDarkMode = colorScheme === "dark";
   const theme = isDarkMode ? Colors.dark : Colors.light;
   const [query, setQuery] = React.useState("");

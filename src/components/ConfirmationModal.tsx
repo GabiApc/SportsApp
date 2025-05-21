@@ -33,7 +33,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   onConfirm,
   onCancel,
 }) => {
-  const { colorScheme, toggleTheme } = useTheme();
+  const { colorScheme } = useTheme();
   const isDarkMode = colorScheme === "dark";
   const theme = isDarkMode ? Colors.dark : Colors.light;
 
@@ -41,7 +41,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     overlay: {
       flex: 1,
       backgroundColor: isDarkMode
-        ? hexToRgba(theme.textPrimary, 0.4)
+        ? hexToRgba(theme.textSecondary, 0.4)
         : "rgba(0,0,0,0.5)",
       justifyContent: "center",
       alignItems: "center",
