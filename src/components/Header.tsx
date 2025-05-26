@@ -3,11 +3,13 @@ import { Feather } from "@expo/vector-icons";
 import React from "react";
 import {
   Platform,
+  StyleProp,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  ViewStyle,
 } from "react-native";
 import { useTheme } from "../hooks/useTheme";
 import { Colors } from "../theme/colors";
@@ -18,13 +20,17 @@ type HeaderProps = {
   onSearchChange?: (query: string) => void;
   showSearch?: boolean;
   iconName: any;
+  iconState?: boolean;
+  buttonStyle?: StyleProp<ViewStyle>; // <— aici
 };
 
 const Header: React.FC<HeaderProps> = ({
   onProfilePress,
   onSearchChange,
   showSearch = true,
+  iconState = false,
   iconName,
+  buttonStyle,
 }) => {
   const { colorScheme } = useTheme();
   const isDarkMode = colorScheme === "dark";
@@ -92,19 +98,20 @@ const Header: React.FC<HeaderProps> = ({
             SportsApp
           </Text>
         </View>
-        {iconName === "user" ? (
+        {iconState && (
           <TouchableOpacity
             onPress={onProfilePress}
-            style={[styles.profileButton, { backgroundColor: theme.primary }]}
+            style={[
+              styles.profileButton,
+              iconState && { backgroundColor: theme.primary },
+              buttonStyle, // <— îl punem la urmă, ca să poată suprascrie
+            ]}
           >
-            <Feather name={iconName} size={20} color={theme.onSurface} />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            onPress={onProfilePress}
-            style={[styles.profileButton]}
-          >
-            <Feather name={iconName} size={20} color={theme.onBackground} />
+            <Feather
+              name={iconName}
+              size={20}
+              color={iconState ? theme.onSurface : theme.onBackground}
+            />
           </TouchableOpacity>
         )}
       </View>

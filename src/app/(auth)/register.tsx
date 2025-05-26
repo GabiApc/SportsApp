@@ -1,8 +1,11 @@
 // src/screens/LoginScreen.tsx
+import { useAuth } from "@/context/authContext";
+import LoadingButton from "@/src/components/LoadingButton";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import {
+  Alert,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -14,26 +17,49 @@ import { useTheme } from "../../hooks/useTheme";
 import { Colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
 
-export default function RegisterScreen() {
+export default function Register() {
   const { colorScheme } = useTheme();
   const isDark = colorScheme === "dark";
   const theme = isDark ? Colors.dark : Colors.light;
   const router = useRouter(); // Adaugă hook-ul router
+  const { register: registerUser } = useAuth();
 
-  const [password, setPassword] = useState("");
+  const nameRef = useRef("");
+  const surnameRef = useRef("");
+  const emailRef = useRef("");
+  const passwordRef = useRef("");
+  const [loading, setLoading] = useState(false);
   const [secure, setSecure] = useState(true);
-
-  const [email, setEmail] = useState("");
-
-  useEffect(() => {
-    setEmail(email);
-    setPassword(password);
-  }, [email, password]);
 
   const handlePasswordVisibility = () => {
     setSecure(!secure);
   };
 
+  const handleSubmit = async () => {
+    if (
+      !emailRef.current ||
+      !passwordRef.current ||
+      !nameRef.current ||
+      !surnameRef.current
+    ) {
+      Alert.alert("Login", "Te rugăm să completezi toate câmpurile.");
+      return;
+    }
+
+    setLoading(true);
+
+    const res = await registerUser(
+      emailRef.current,
+      passwordRef.current,
+      nameRef.current,
+      surnameRef.current,
+    );
+    setLoading(false);
+    console.log("register result: ", res);
+    if (!res.success) {
+      Alert.alert("Eroare", res.msg || "A apărut o eroare la înregistrare.");
+    }
+  };
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -176,8 +202,7 @@ export default function RegisterScreen() {
                 width: "48%",
               },
             ]}
-            value={email}
-            onChangeText={setEmail}
+            onChangeText={(value) => (nameRef.current = value)}
             placeholder="Nume"
             placeholderTextColor={theme.textSecondary}
           />
@@ -191,8 +216,7 @@ export default function RegisterScreen() {
                 width: "48%",
               },
             ]}
-            value={email}
-            onChangeText={setEmail}
+            onChangeText={(value) => (surnameRef.current = value)}
             placeholder="Prenume"
             placeholderTextColor={theme.textSecondary}
           />
@@ -206,8 +230,7 @@ export default function RegisterScreen() {
               fontSize: typography.fontSizes.caption,
             },
           ]}
-          value={email}
-          onChangeText={setEmail}
+          onChangeText={(value) => (emailRef.current = value)}
           placeholder="email@exemplu.com"
           placeholderTextColor={theme.textSecondary}
           keyboardType="email-address"
@@ -224,8 +247,7 @@ export default function RegisterScreen() {
                 paddingRight: 40, // spațiu pentru iconiță
               },
             ]}
-            value={password}
-            onChangeText={setPassword}
+            onChangeText={(value) => (passwordRef.current = value)}
             placeholder="Parola"
             placeholderTextColor={theme.textSecondary}
             secureTextEntry={secure}
@@ -250,7 +272,7 @@ export default function RegisterScreen() {
             />
           </TouchableOpacity>
           {/* Log In */}
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={[styles.button, { backgroundColor: theme.primary }]}
             activeOpacity={0.8}
             onPress={() => {
@@ -268,7 +290,12 @@ export default function RegisterScreen() {
             >
               Crează cont
             </Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
+          <LoadingButton
+            title="Crează cont"
+            loading={loading}
+            onPress={handleSubmit}
+          />
 
           {/* Sign up link */}
         </View>

@@ -18,6 +18,7 @@ import {
 import { Colors } from "../theme/colors";
 import { typography } from "../theme/typography";
 
+import { AuthProvider } from "@/context/authContext";
 import { useTheme } from "@/src/hooks/useTheme";
 
 type ExtendedPaperTheme = MD3Theme & { typography: typeof typography };
@@ -46,7 +47,21 @@ const CombinedDarkTheme = merge(
   DarkTheme,
   customDarkTheme,
 ) as ExtendedPaperTheme;
+const StackLayout = () => {
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen
+        name="(tabs)"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
 
+      <Stack.Screen name="details" options={{ headerShown: false }} />
+    </Stack>
+  );
+};
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     "Poppins-Regular": require("../../assets/fonts/Poppins-Regular.ttf"),
@@ -65,8 +80,11 @@ export default function RootLayout() {
   return (
     <PaperProvider theme={paperTheme}>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : LightTheme}>
-        <Stack>
-          <Stack.Screen name="details" options={{ headerShown: false }} />
+        <AuthProvider>
+          <StackLayout />
+        </AuthProvider>
+        {/* <Stack>
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
 
           <Stack.Screen
             name="(tabs)"
@@ -74,8 +92,8 @@ export default function RootLayout() {
               headerShown: false,
             }}
           />
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        </Stack>
+          <Stack.Screen name="details" options={{ headerShown: false }} />
+        </Stack> */}
       </ThemeProvider>
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
     </PaperProvider>

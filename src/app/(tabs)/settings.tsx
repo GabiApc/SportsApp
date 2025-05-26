@@ -1,12 +1,14 @@
 // src/components/SettingsSection.tsx
+import { auth } from "@/config/firebase";
+import { useAuth } from "@/context/authContext";
 import { ConfirmationModal } from "@/src/components/ConfirmationModal";
-import EditUserModal from "@/src/components/EditUserModal";
 import Header from "@/src/components/Header";
 import ProfileCard from "@/src/components/ProfileCard";
 import { useTheme } from "@/src/hooks/useTheme";
 import { Colors } from "@/src/theme/colors";
 import { typography } from "@/src/theme/typography";
 import { Feather } from "@expo/vector-icons";
+import { signOut } from "@firebase/auth";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 
@@ -30,12 +32,13 @@ export default function SettingsSection() {
     setEmail(newEmail);
     closeEdit();
   };
-
+  const { user } = useAuth();
   const router = useRouter();
-  const handleLogout = () => {
+  const handleLogout = async () => {
     // logică de logout
+    await signOut(auth);
     setLogoutModalVisible(false);
-    router.replace("/login");
+    router.replace("/(tabs)");
   };
 
   const styles = StyleSheet.create({
@@ -119,24 +122,23 @@ export default function SettingsSection() {
         }}
         onCancel={() => handleLogout()}
       />
-      <EditUserModal
-        visible={editVisible}
-        initialName={name}
-        initialEmail={email}
-        onSave={handleSave}
-        onCancel={closeEdit}
-      />
+
       <Header
         onProfilePress={() => setLogoutModalVisible(true)}
         onSearchChange={(q) => console.log("Căutare:", q)}
         showSearch={false}
         iconName="log-out"
+        iconState={user ? true : false}
+        buttonStyle={{ backgroundColor: "transparent" }}
       />
-      <ProfileCard
-        name="Mihai Crăciun"
-        email="mihaicraciun@gmail.com"
-        onEditPress={() => setEditVisible(true)}
-      />
+      {user && (
+        <ProfileCard
+          name={user.name || name}
+          email={user.email || email}
+          onEditPress={() => setEditVisible(true)}
+        />
+      )}
+
       <View style={styles.settings}>
         <Text style={[styles.header, { color: theme.onBackground }]}>
           Setările contului

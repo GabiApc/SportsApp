@@ -1,8 +1,11 @@
 // src/screens/LoginScreen.tsx
+import { useAuth } from "@/context/authContext";
+import LoadingButton from "@/src/components/LoadingButton";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
+  Alert,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -14,24 +17,32 @@ import { useTheme } from "../../hooks/useTheme";
 import { Colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
 
-export default function LoginScreen() {
+export default function Login() {
   const { colorScheme } = useTheme();
   const isDark = colorScheme === "dark";
   const theme = isDark ? Colors.dark : Colors.light;
   const router = useRouter(); // Adaugă hook-ul router
 
-  const [password, setPassword] = useState("");
+  const emailRef = useRef("");
+  const passwordRef = useRef("");
+  const [loading, setLoading] = useState(false);
   const [secure, setSecure] = useState(true);
-
-  const [email, setEmail] = useState("");
-
-  useEffect(() => {
-    setEmail(email);
-    setPassword(password);
-  }, [email, password]);
-
+  const { login: loginUser } = useAuth();
   const handlePasswordVisibility = () => {
     setSecure(!secure);
+  };
+
+  const handleSubmit = async () => {
+    if (!emailRef.current || !passwordRef.current) {
+      Alert.alert("Login", "Te rugăm să completezi toate câmpurile.");
+      return;
+    }
+    setLoading(true);
+    const res = await loginUser(emailRef.current, passwordRef.current);
+    setLoading(false);
+    if (!res.success) {
+      Alert.alert("Login", res.msg);
+    }
   };
 
   const styles = StyleSheet.create({
@@ -136,8 +147,7 @@ export default function LoginScreen() {
               fontSize: typography.fontSizes.caption,
             },
           ]}
-          value={email}
-          onChangeText={setEmail}
+          onChangeText={(value) => (emailRef.current = value)}
           placeholder="email@exemplu.com"
           placeholderTextColor={theme.textSecondary}
           keyboardType="email-address"
@@ -154,8 +164,7 @@ export default function LoginScreen() {
                 paddingRight: 40, // spațiu pentru iconiță
               },
             ]}
-            value={password}
-            onChangeText={setPassword}
+            onChangeText={(value) => (passwordRef.current = value)}
             placeholder="Parola"
             placeholderTextColor={theme.textSecondary}
             secureTextEntry={secure}
@@ -175,30 +184,16 @@ export default function LoginScreen() {
           >
             <Feather
               name={secure ? "eye-off" : "eye"}
-              size={20}
-              color={theme.textPrimary}
+              size={17}
+              color={theme.textSecondary}
             />
           </TouchableOpacity>
-          {/* Log In */}
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: theme.primary }]}
-            activeOpacity={0.8}
-            onPress={() => {
-              router.replace("/"); // Navighează către index
-            }}
-          >
-            <Text
-              style={[
-                styles.buttonText,
-                {
-                  color: theme.onSurface,
-                  fontFamily: typography.fonts.medium,
-                },
-              ]}
-            >
-              Log In
-            </Text>
-          </TouchableOpacity>
+
+          <LoadingButton
+            title="Log In"
+            loading={loading}
+            onPress={handleSubmit}
+          />
 
           {/* Sign up link */}
           <View style={styles.signUpRow}>
@@ -215,7 +210,7 @@ export default function LoginScreen() {
             </Text>
             <TouchableOpacity
               onPress={() => {
-                router.push("/register"); // Navighează către index
+                router.push("/register");
               }}
             >
               <Text

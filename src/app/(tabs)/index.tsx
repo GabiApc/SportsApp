@@ -1,3 +1,4 @@
+import { useAuth } from "@/context/authContext";
 import Header from "@/src/components/Header";
 import { Team, TeamsSection } from "@/src/components/TeamSection";
 import { useTheme } from "@/src/hooks/useTheme";
@@ -57,6 +58,8 @@ const initialTeams: Team[] = [
 ];
 
 export default function Index() {
+  const { user } = useAuth();
+  console.log("user", user);
   const { colorScheme } = useTheme();
   const isDarkMode = colorScheme === "dark";
   const theme = isDarkMode ? Colors.dark : Colors.light;
@@ -97,6 +100,7 @@ export default function Index() {
         onProfilePress={() => {}}
         onSearchChange={(q) => console.log("Căutare:", q)}
         iconName={"user"}
+        iconState={user ? true : false}
       />
       <View style={styles.section}>
         <TeamsSection

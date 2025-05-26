@@ -1,7 +1,7 @@
 // src/screens/LoginScreen.tsx
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   SafeAreaView,
   StyleSheet,
@@ -22,20 +22,7 @@ export default function DetailsScreen() {
   const theme = isDark ? Colors.dark : Colors.light;
   const router = useRouter(); // Adaugă hook-ul router
 
-  const [password, setPassword] = useState("");
-  const [secure, setSecure] = useState(true);
-
-  const [email, setEmail] = useState("");
   const [active, setActive] = useState("Descriere");
-
-  useEffect(() => {
-    setEmail(email);
-    setPassword(password);
-  }, [email, password]);
-
-  const handlePasswordVisibility = () => {
-    setSecure(!secure);
-  };
 
   const styles = StyleSheet.create({
     container: {
