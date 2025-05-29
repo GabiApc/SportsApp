@@ -19,6 +19,8 @@ import { typography } from "../theme/typography";
 
 import { AuthProvider } from "@/context/authContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
+import { useEffect } from "react";
+import { prefetchLeagueTable, prefetchTeam } from "../services/cache";
 
 type ExtendedPaperTheme = MD3Theme & { typography: typeof typography };
 
@@ -71,6 +73,10 @@ function InnerProviders() {
   );
 }
 export default function RootLayout() {
+  useEffect(() => {
+    prefetchTeam("English Premier League");
+    prefetchLeagueTable("4328", "2024-2025");
+  }, []);
   const [fontsLoaded] = useFonts({
     "Poppins-Regular": require("../../assets/fonts/Poppins-Regular.ttf"),
     "Poppins-Medium": require("../../assets/fonts/Poppins-Medium.ttf"),

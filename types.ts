@@ -18,7 +18,7 @@ export type AuthContextType = {
 export type UserType = {
   id: string;
   name: string;
-  surname: string;
+  surname?: string;
   email: string;
 };
 export interface ApiTeam {

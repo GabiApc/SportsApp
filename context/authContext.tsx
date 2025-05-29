@@ -22,8 +22,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (firebaseUser) {
         setUser({
           id: firebaseUser.uid,
-          name: firebaseUser.displayName,
-          email: firebaseUser.email,
+          name: firebaseUser.displayName ?? "",
+          email: firebaseUser.email ?? "",
         });
         updateUserData(firebaseUser.uid);
 
@@ -96,8 +96,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       } else {
         console.log("No such document!");
       }
-
-      console.log("User data updated successfully");
     } catch (error: any) {
       let msg = error.message;
       // return { success: false, msg };

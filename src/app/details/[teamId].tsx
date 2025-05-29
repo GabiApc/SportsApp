@@ -4,7 +4,7 @@ import HorizontalTabBar from "@/src/components/horizontalTabBar";
 import LeagueTable, { LeagueTableRow } from "@/src/components/LeagueTable";
 import TeamCard from "@/src/components/TeamCard";
 import { useCachedTeams } from "@/src/hooks/useCachedTeams";
-import { useLeagueTable } from "@/src/hooks/useLeagueTable";
+import { useCachedLeagueTable } from "@/src/hooks/useLeagueTable";
 import { Colors } from "@/src/theme/colors";
 import { typography } from "@/src/theme/typography";
 import { Feather } from "@expo/vector-icons";
@@ -30,7 +30,7 @@ export default function DetailsScreen() {
   const { teamId } = useLocalSearchParams<{ teamId: string }>();
   const router = useRouter();
 
-  const { teams, loading } = useCachedTeams();
+  const { teams } = useCachedTeams();
   const detail = teams.find((t) => t.idTeam === teamId);
 
   const [activeTab, setActiveTab] = React.useState<"Descriere" | "Clasament">(
@@ -38,8 +38,7 @@ export default function DetailsScreen() {
   );
 
   const [expanded, setExpanded] = React.useState(false);
-  const { table, error } = useLeagueTable("4328", "2024-2025");
-  console.log(JSON.stringify(table, null, 2));
+  const { table, loading, error } = useCachedLeagueTable("4328", "2024-2025");
 
   if (loading) return <ActivityIndicator />;
   if (error) return <Text>Error: {error.message}</Text>;

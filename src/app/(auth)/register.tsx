@@ -55,7 +55,6 @@ export default function Register() {
       surnameRef.current,
     );
     setLoading(false);
-    console.log("register result: ", res);
     if (!res.success) {
       Alert.alert("Eroare", res.msg || "A apărut o eroare la înregistrare.");
     }

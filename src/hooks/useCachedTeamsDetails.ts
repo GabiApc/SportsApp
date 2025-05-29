@@ -19,7 +19,6 @@ export function useCachedTeamDetail(teamId: string) {
         const json = await AsyncStorage.getItem(DETAILS_KEY);
         const map = json ? (JSON.parse(json) as Record<string, ApiTeam>) : {};
         setDetail(map[teamId] || null);
-        console.log(map[teamId]);
       } catch (e) {
         console.warn("useCachedTeamDetail: failed to load", e);
       } finally {
