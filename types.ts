@@ -38,3 +38,33 @@ export interface ApiTeam {
 export interface TeamsResponse {
   teams: ApiTeam[] | null;
 }
+
+export interface ApiEvent {
+  idEvent: string;
+  strEvent: string;
+  dateEvent: string;
+  intHomeScore: string;
+  intAwayScore: string;
+}
+
+export interface EventsResponse {
+  results?: ApiEvent[];
+}
+export interface LeagueTableEntry {
+  name: string;
+  intRank: string;
+  idTeam: string;
+  idLeague: string;
+  idSeason: string;
+  strSeason: string;
+  strForm: string;
+  intPlayed: string;
+  intWin: string;
+  intDraw: string;
+  intLoss: string;
+  intGoalsFor: string;
+  intGoalsAgainst: string;
+  intGoalDifference: string;
+  intPoints: string;
+  intBadge: string;
+}

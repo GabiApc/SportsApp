@@ -1,8 +1,10 @@
 // src/app/details/[teamId].tsx
 import { useTheme } from "@/context/ThemeContext";
 import HorizontalTabBar from "@/src/components/horizontalTabBar";
+import LeagueTable, { LeagueTableRow } from "@/src/components/LeagueTable";
 import TeamCard from "@/src/components/TeamCard";
 import { useCachedTeams } from "@/src/hooks/useCachedTeams";
+import { useLeagueTable } from "@/src/hooks/useLeagueTable";
 import { Colors } from "@/src/theme/colors";
 import { typography } from "@/src/theme/typography";
 import { Feather } from "@expo/vector-icons";
@@ -31,10 +33,15 @@ export default function DetailsScreen() {
   const { teams, loading } = useCachedTeams();
   const detail = teams.find((t) => t.idTeam === teamId);
 
-  const [activeTab, setActiveTab] = React.useState<"Descriere" | "Rezultate">(
+  const [activeTab, setActiveTab] = React.useState<"Descriere" | "Clasament">(
     "Descriere",
   );
   const [expanded, setExpanded] = React.useState(false);
+  const { table, error } = useLeagueTable("4328", "2024-2025");
+  console.log(JSON.stringify(table, null, 2));
+
+  if (loading) return <ActivityIndicator />;
+  if (error) return <Text>Error: {error.message}</Text>;
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background },
@@ -49,7 +56,7 @@ export default function DetailsScreen() {
     },
     backButton: { position: "absolute", left: 30, top: 50, zIndex: 2 },
     title: {
-      fontSize: typography.fontSizes.title,
+      fontSize: typography.fontSizes.body,
       fontFamily: typography.fonts.medium,
       textAlign: "center",
       marginTop: 40,
@@ -61,7 +68,14 @@ export default function DetailsScreen() {
       alignSelf: "center",
       justifyContent: "flex-start",
     },
-    section: { padding: 16, width: "85%", alignSelf: "center", marginTop: 100 },
+    section: {
+      paddingHorizontal: 10,
+      width: "85%",
+      alignSelf: "center",
+      height: "50%",
+      marginTop: 100,
+      marginBottom: 10,
+    },
     loader: { flex: 1, justifyContent: "center", alignItems: "center" },
     errorText: {
       color: theme.onBackground,
@@ -123,6 +137,15 @@ export default function DetailsScreen() {
   const leagues = [detail.strLeague].filter(Boolean) as string[];
   const mascots = detail.strMascots?.split(",").map((s) => s.trim()) || [];
 
+  const rows: LeagueTableRow[] = table.map((d) => ({
+    idTeam: d.idTeam,
+    rank: parseInt(d.intRank, 10),
+    name: teams.find((t) => t.idTeam === d.idTeam)?.strTeam ?? d.name,
+    badgeUri: teams.find((t) => t.idTeam === d.idTeam)?.strBadge ?? d.intBadge,
+    played: parseInt(d.intPlayed, 10),
+    win: parseInt(d.intWin, 10),
+    points: parseInt(d.intPoints, 10),
+  }));
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -143,9 +166,9 @@ export default function DetailsScreen() {
 
       <View style={styles.tabContainer}>
         <HorizontalTabBar
-          tabs={["Descriere", "Rezultate"]}
+          tabs={["Descriere", "Clasament"]}
           activeTab={activeTab}
-          onTabPress={(tab) => setActiveTab(tab as "Descriere" | "Rezultate")}
+          onTabPress={(tab) => setActiveTab(tab as "Descriere" | "Clasament")}
         />
       </View>
 
@@ -166,16 +189,16 @@ export default function DetailsScreen() {
           </Text>
 
           {/* Static fields */}
-          <Text style={styles.fieldLabel}>Arena/Stadium:</Text>
+          <Text style={styles.fieldLabel}>Arena/Stadion:</Text>
           <Text style={styles.fieldValue}>{detail.strStadium}</Text>
-
+          {/* 
           <Text style={styles.fieldLabel}>Manager:</Text>
-          <Text style={styles.fieldValue}>{detail.strManager}</Text>
+          <Text style={styles.fieldValue}>{detail.strManager}</Text> */}
 
-          <Text style={styles.fieldLabel}>Founded:</Text>
+          <Text style={styles.fieldLabel}>An înființare:</Text>
           <Text style={styles.fieldValue}>{detail.intFormedYear}</Text>
 
-          <Text style={styles.fieldLabel}>Location:</Text>
+          <Text style={styles.fieldLabel}>Locație:</Text>
           <Text style={styles.fieldLink}>{location}</Text>
 
           {/* {nicknames.length > 0 && (
@@ -187,25 +210,23 @@ export default function DetailsScreen() {
 
           {leagues.length > 0 && (
             <>
-              <Text style={styles.fieldLabel}>Leagues:</Text>
+              <Text style={styles.fieldLabel}>Ligi înscrise:</Text>
               <Text style={styles.fieldValue}>{leagues.join(", ")}</Text>
             </>
           )}
 
           {mascots.length > 0 && (
             <>
-              <Text style={styles.fieldLabel}>Mascots:</Text>
+              <Text style={styles.fieldLabel}>Mascota:</Text>
               <Text style={styles.fieldValue}>{mascots.join(", ")}</Text>
             </>
           )}
         </ScrollView>
       )}
 
-      {activeTab === "Rezultate" && (
+      {activeTab === "Clasament" && (
         <View style={styles.section}>
-          <Text style={styles.errorText}>
-            Rezultatele nu sunt încă implementate.
-          </Text>
+          <LeagueTable data={rows} currentTeamId={teamId} />
         </View>
       )}
     </SafeAreaView>

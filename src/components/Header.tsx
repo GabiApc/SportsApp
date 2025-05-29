@@ -48,6 +48,7 @@ const Header: React.FC<HeaderProps> = ({
       paddingHorizontal: 10,
       paddingBottom: 16,
       width: "90%",
+      alignSelf: "center",
     },
     topRow: {
       flexDirection: "row",
