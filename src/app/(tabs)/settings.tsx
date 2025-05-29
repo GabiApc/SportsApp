@@ -1,5 +1,5 @@
 // src/components/SettingsSection.tsx
-import { auth } from "@/config/firebase";
+import { auth, firestore } from "@/config/firebase";
 import { useAuth } from "@/context/authContext";
 import { useTheme } from "@/context/ThemeContext";
 import { ConfirmationModal } from "@/src/components/ConfirmationModal";
@@ -11,9 +11,11 @@ import { typography } from "@/src/theme/typography";
 import { Feather } from "@expo/vector-icons";
 import { signOut } from "@firebase/auth";
 import { useRouter } from "expo-router";
+import { doc, updateDoc } from "firebase/firestore";
 import React, { useState } from "react";
 
-import { Platform, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Platform, StyleSheet, Switch, Text, View } from "react-native";
+import { ActivityIndicator } from "react-native-paper";
 
 export default function SettingsSection() {
   const { colorScheme, toggleTheme } = useTheme();
@@ -22,18 +24,39 @@ export default function SettingsSection() {
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = React.useState(false);
   const [editVisible, setEditVisible] = useState(false);
-  const [name, setName] = useState("Mihai Crăciun");
-  const [email, setEmail] = useState("mihai.craciun@gmail.com");
+  const [loading, setLoading] = useState(false);
+
+  const { user, updateUserData } = useAuth();
+  // and then at render time:
+  const name = user?.name ?? "";
+  const email = user?.email ?? "";
 
   const openEdit = () => setEditVisible(true);
   const closeEdit = () => setEditVisible(false);
 
-  const handleSave = (newName: string, newEmail: string) => {
-    setName(newName);
-    setEmail(newEmail);
-    closeEdit();
+  /** Called when the user presses \"Save\" in the edit modal */
+  const handleSave = async (newName: string, newEmail: string) => {
+    if (!user) return;
+
+    try {
+      // 1) Update Firestore
+      const userRef = doc(firestore, "users", user.id);
+      await updateDoc(userRef, {
+        name: newName,
+        email: newEmail,
+      });
+      setLoading(true);
+
+      // 3) Let your AuthContext re-fetch the latest user data
+      await updateUserData(user.id);
+    } catch (err) {
+      console.error("Error updating user data", err);
+      Alert.alert("Eroare", "Nu am putut salva modificările.");
+    } finally {
+      closeEdit();
+      setLoading(false);
+    }
   };
-  const { user } = useAuth();
   const router = useRouter();
   const handleLogout = async () => {
     // logică de logout
@@ -108,8 +131,19 @@ export default function SettingsSection() {
       alignContent: "center",
       paddingHorizontal: 5,
     },
+    loader: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
   });
-
+  if (loading) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
   return (
     <View style={styles.container}>
       <ConfirmationModal
@@ -136,14 +170,14 @@ export default function SettingsSection() {
         onSearchChange={(q) => console.log("Căutare:", q)}
         showSearch={false}
         iconName="log-out"
-        iconState={true}
+        iconState={!user ? false : true}
         buttonStyle={{ backgroundColor: "transparent" }}
       />
       {user && (
         <ProfileCard
-          name={user.name || name}
-          email={user.email || email}
-          onEditPress={() => setEditVisible(true)}
+          name={user.name}
+          email={user.email}
+          onEditPress={openEdit}
         />
       )}
 

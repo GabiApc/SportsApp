@@ -46,21 +46,30 @@ const CombinedDarkTheme = merge(
   DarkTheme,
   customDarkTheme,
 ) as ExtendedPaperTheme;
-const StackLayout = () => {
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen
-        name="(tabs)"
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+// const colorScheme = useColorScheme();
 
-      <Stack.Screen name="details/[teamId]" options={{ headerShown: false }} />
-    </Stack>
+function InnerProviders() {
+  // Now this hook is inside ThemeProvider’s tree:
+  const { colorScheme } = useTheme();
+  const paperTheme =
+    colorScheme === "dark" ? CombinedDarkTheme : CombinedDefaultTheme;
+
+  return (
+    <PaperProvider theme={paperTheme}>
+      <AuthProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="details/[teamId]"
+            options={{ headerShown: false }}
+          />
+        </Stack>
+      </AuthProvider>
+      <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+    </PaperProvider>
   );
-};
+}
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     "Poppins-Regular": require("../../assets/fonts/Poppins-Regular.ttf"),
@@ -68,22 +77,12 @@ export default function RootLayout() {
     "Poppins-Bold": require("../../assets/fonts/Poppins-Bold.ttf"),
   });
 
-  // const colorScheme = useColorScheme();
-  const { colorScheme } = useTheme();
-  const paperTheme =
-    colorScheme === "dark" ? CombinedDarkTheme : CombinedDefaultTheme;
-
   if (!fontsLoaded) {
     return null; // or a loading spinner
   }
   return (
-    <PaperProvider theme={paperTheme}>
-      <ThemeProvider>
-        <AuthProvider>
-          <StackLayout />
-        </AuthProvider>
-      </ThemeProvider>
-      <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-    </PaperProvider>
+    <ThemeProvider>
+      <InnerProviders />
+    </ThemeProvider>
   );
 }
