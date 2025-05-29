@@ -1,8 +1,9 @@
-// src/screens/TeamsScreen.tsx (sau Index.tsx)
+// src/screens/TeamsScreen.tsx
 import { firestore } from "@/config/firebase";
 import { useAuth } from "@/context/authContext";
 import { useTheme } from "@/context/ThemeContext";
 import { ConfirmationModal } from "@/src/components/ConfirmationModal";
+import Toast from "@/src/components/FloatingToast";
 import Header from "@/src/components/Header";
 import {
   Team as SectionTeam,
@@ -21,21 +22,22 @@ import {
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
-// **Înlocuieşte** useLoadedTeams cu useTeamsWithDetails:
-
 export default function TeamsScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const { colorScheme } = useTheme();
-  const isDarkMode = colorScheme === "dark";
-  const theme = isDarkMode ? Colors.dark : Colors.light;
-  const [Visible, setVisible] = useState(false);
+  const theme = colorScheme === "dark" ? Colors.dark : Colors.light;
 
-  // apelăm noul hook
+  // full list from cache
   const { teams: apiTeams, loading } = useCachedTeams();
 
-  // favorites din Firestore
+  // search query state
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [toastVisible, setToastVisible] = useState(false);
+
+  // favorites from Firestore
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     if (!user) {
       setFavIds(new Set());
@@ -50,30 +52,38 @@ export default function TeamsScreen() {
     return () => unsub();
   }, [user]);
 
-  // mapăm ApiTeam → SectionTeam
+  // map API → SectionTeam
   const sectionTeams: SectionTeam[] = apiTeams.map((t) => ({
     id: t.idTeam,
     name: t.strTeam,
-    // poţi lua league-ul direct din detailsMap dacă vrei mai multe niveluri
     leagueInfo: t.strLeague ?? "",
     logoUri: t.strBadge,
     favorited: favIds.has(t.idTeam),
   }));
 
+  // filter by search query (case-insensitive substring)
+  const filteredTeams = sectionTeams.filter((team) =>
+    team.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+  );
+
+  // navigation to details
   const onTeamPress = useCallback(
     (team: SectionTeam) => {
       router.push({
         pathname: "/details/[teamId]",
-        params: { teamId: team.id, colorScheme: colorScheme },
+        params: { teamId: team.id },
       });
     },
     [router],
   );
 
+  // toggle favorite
+  const [modalVisible, setModalVisible] = useState(false);
   const toggleFav = useCallback(
     async (team: SectionTeam) => {
       if (!user) {
-        return setVisible(true);
+        setModalVisible(true);
+        return;
       }
       const ref = doc(firestore, "users", user.id, "favorites", team.id);
       if (favIds.has(team.id)) {
@@ -84,6 +94,7 @@ export default function TeamsScreen() {
           logoUri: team.logoUri,
           leagueInfo: team.leagueInfo,
         });
+        setToastVisible(true);
       }
     },
     [favIds, user],
@@ -97,33 +108,39 @@ export default function TeamsScreen() {
     );
   }
 
-  function handleConfirmLogin(): void {
-    setVisible(false);
+  const handleConfirmLogin = () => {
+    setModalVisible(false);
     router.push("/login");
-  }
-  function handleCancelLogin(): void {
-    setVisible(false);
-  }
+  };
+  const handleCancelLogin = () => setModalVisible(false);
 
   return (
     <View style={styles(theme).container}>
+      <Toast
+        message="Echipa a fost adăugată la favorite!"
+        visible={toastVisible}
+        onHide={() => setToastVisible(false)}
+      />
       <ConfirmationModal
-        visible={Visible}
+        visible={modalVisible}
         title="Trebuie să fii logat pentru a salva la favorite"
         message="Vrei să te loghezi?"
         onConfirm={handleConfirmLogin}
         onCancel={handleCancelLogin}
       />
+
+      {/* Pass `setSearchQuery` into Header so typing there updates our state */}
       <Header
         onProfilePress={() => {}}
-        onSearchChange={(q) => console.log("Căutare:", q)}
+        onSearchChange={setSearchQuery}
         iconName="user"
         iconState={Boolean(user)}
       />
+
       <View style={styles(theme).section}>
         <TeamsSection
           title="Echipe populare"
-          teams={sectionTeams}
+          teams={filteredTeams}
           onPressTeam={onTeamPress}
           onToggleFavorite={toggleFav}
         />
@@ -142,6 +159,7 @@ const styles = (theme: typeof Colors.light | typeof Colors.dark) =>
       flex: 1,
       width: "100%",
       paddingHorizontal: 16,
+      marginBottom: 150,
     },
     loader: {
       flex: 1,

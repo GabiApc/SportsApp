@@ -36,6 +36,7 @@ export default function DetailsScreen() {
   const [activeTab, setActiveTab] = React.useState<"Descriere" | "Clasament">(
     "Descriere",
   );
+
   const [expanded, setExpanded] = React.useState(false);
   const { table, error } = useLeagueTable("4328", "2024-2025");
   console.log(JSON.stringify(table, null, 2));

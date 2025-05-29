@@ -1,3 +1,4 @@
+// src/screens/Saved.tsx
 import { firestore } from "@/config/firebase";
 import { useAuth } from "@/context/authContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -7,16 +8,17 @@ import {
   TeamsSection,
 } from "@/src/components/TeamSection";
 import { Colors } from "@/src/theme/colors";
+import { typography } from "@/src/theme/typography";
 import { useRouter } from "expo-router";
 import { collection, deleteDoc, doc, onSnapshot } from "firebase/firestore";
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Saved() {
   const { user } = useAuth();
   const { colorScheme } = useTheme();
-  const isDarkMode = colorScheme === "dark";
-  const theme = isDarkMode ? Colors.dark : Colors.light;
+  const theme = colorScheme === "dark" ? Colors.dark : Colors.light;
   const router = useRouter();
 
   const styles = StyleSheet.create({
@@ -33,11 +35,30 @@ export default function Saved() {
       flex: 1,
       width: "100%",
       paddingHorizontal: 16,
+      marginBottom: 140,
+    },
+    messageContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 32,
+    },
+    messageText: {
+      color: theme.textSecondary,
+      fontSize: typography.fontSizes.body,
+      fontFamily: typography.fonts.regular,
+      textAlign: "center",
     },
   });
 
   const [favorites, setFavorites] = useState<SectionTeam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // filter by search query
+  const filteredFavorites = favorites.filter((team) =>
+    team.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+  );
 
   useEffect(() => {
     if (!user) {
@@ -103,27 +124,43 @@ export default function Saved() {
   if (loading) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Header
         onProfilePress={() => {}}
-        onSearchChange={(q) => console.log("Căutare în favorite:", q)}
+        onSearchChange={setSearchQuery}
+        showSearch={user && filteredFavorites.length > 0 ? true : false}
         iconName="user"
         iconState={Boolean(user)}
       />
+
       <View style={styles.section}>
-        <TeamsSection
-          title="Echipe preferate"
-          teams={favorites}
-          onPressTeam={onTeamPress}
-          onToggleFavorite={toggleFav}
-        />
+        {!user ? (
+          <View style={styles.messageContainer}>
+            <Text style={styles.messageText}>
+              Trebuie să fii logat ca să vezi echipele preferate.
+            </Text>
+          </View>
+        ) : filteredFavorites.length === 0 ? (
+          <View style={styles.messageContainer}>
+            <Text style={styles.messageText}>
+              Nu ai încă echipe salvate la favorite.
+            </Text>
+          </View>
+        ) : (
+          <TeamsSection
+            title="Echipe preferate"
+            teams={filteredFavorites}
+            onPressTeam={onTeamPress}
+            onToggleFavorite={toggleFav}
+          />
+        )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
