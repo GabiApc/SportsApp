@@ -59,6 +59,7 @@ const StackLayout = () => {
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
 
       <Stack.Screen name="details" options={{ headerShown: false }} />
+      <Stack.Screen name="details/[teamId]" options={{ headerShown: false }} />
     </Stack>
   );
 };

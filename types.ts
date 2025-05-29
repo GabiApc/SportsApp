@@ -1,6 +1,7 @@
+// types.ts
 export type AuthContextType = {
-  user: UserType;
-  setUser: Function;
+  user: UserType | null;
+  setUser: (user: UserType | null) => void;
   login: (
     email: string,
     password: string,
@@ -15,8 +16,25 @@ export type AuthContextType = {
 };
 
 export type UserType = {
-  id?: string;
+  id: string;
   name: string;
   surname: string;
   email: string;
-} | null;
+};
+export interface ApiTeam {
+  idTeam: string;
+  strTeam: string;
+  strBadge: string;
+  strLeague?: string;
+  intFormedYear?: string;
+  strStadium?: string;
+  strManager?: string;
+  strStadiumLocation?: string;
+  strCountry?: string;
+  strDescriptionEN?: string;
+  strMascots?: string;
+}
+
+export interface TeamsResponse {
+  teams: ApiTeam[] | null;
+}

@@ -2,6 +2,7 @@
 import { auth } from "@/config/firebase";
 import { useAuth } from "@/context/authContext";
 import { ConfirmationModal } from "@/src/components/ConfirmationModal";
+import EditUserModal from "@/src/components/EditUserModal";
 import Header from "@/src/components/Header";
 import ProfileCard from "@/src/components/ProfileCard";
 import { useTheme } from "@/src/hooks/useTheme";
@@ -123,12 +124,19 @@ export default function SettingsSection() {
         onCancel={() => handleLogout()}
       />
 
+      <EditUserModal
+        visible={editVisible}
+        initialName={user?.name || name}
+        initialEmail={user?.email || email}
+        onSave={handleSave}
+        onCancel={closeEdit}
+      />
       <Header
         onProfilePress={() => setLogoutModalVisible(true)}
         onSearchChange={(q) => console.log("Căutare:", q)}
         showSearch={false}
         iconName="log-out"
-        iconState={user ? true : false}
+        iconState={true}
         buttonStyle={{ backgroundColor: "transparent" }}
       />
       {user && (

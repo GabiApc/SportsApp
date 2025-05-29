@@ -1,13 +1,8 @@
 // src/components/HorizontalTabBar.tsx
+
 import React from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useTheme } from "../hooks/useTheme";
 import { Colors } from "../theme/colors";
 import { typography } from "../theme/typography";
 
@@ -25,9 +20,9 @@ const HorizontalTabBar: React.FC<HorizontalTabBarProps> = ({
   activeTab,
   onTabPress,
 }) => {
-  const scheme = useColorScheme();
-  const theme = scheme === "dark" ? Colors.dark : Colors.light;
-
+  const { colorScheme } = useTheme();
+  const isDarkMode = colorScheme === "dark";
+  const theme = isDarkMode ? Colors.dark : Colors.light;
   return (
     <View style={styles.container}>
       <ScrollView

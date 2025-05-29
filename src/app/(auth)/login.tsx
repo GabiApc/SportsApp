@@ -1,6 +1,9 @@
 // src/screens/LoginScreen.tsx
 import { useAuth } from "@/context/authContext";
+import { useTheme } from "@/context/ThemeContext";
 import LoadingButton from "@/src/components/LoadingButton";
+import { Colors } from "@/src/theme/colors";
+import { typography } from "@/src/theme/typography";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
@@ -13,24 +16,20 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useTheme } from "../../hooks/useTheme";
-import { Colors } from "../../theme/colors";
-import { typography } from "../../theme/typography";
 
 export default function Login() {
   const { colorScheme } = useTheme();
   const isDark = colorScheme === "dark";
   const theme = isDark ? Colors.dark : Colors.light;
-  const router = useRouter(); // Adaugă hook-ul router
+  const router = useRouter();
 
   const emailRef = useRef("");
   const passwordRef = useRef("");
   const [loading, setLoading] = useState(false);
   const [secure, setSecure] = useState(true);
   const { login: loginUser } = useAuth();
-  const handlePasswordVisibility = () => {
-    setSecure(!secure);
-  };
+
+  const handlePasswordVisibility = () => setSecure((prev) => !prev);
 
   const handleSubmit = async () => {
     if (!emailRef.current || !passwordRef.current) {
@@ -66,12 +65,14 @@ export default function Login() {
       fontFamily: typography.fonts.bold,
       textAlign: "center",
       marginBottom: 8,
+      color: theme.onSurface,
     },
     subhead: {
       fontSize: typography.fontSizes.caption,
       fontFamily: typography.fonts.medium,
       textAlign: "center",
       marginBottom: 24,
+      color: theme.onSurface,
     },
     card: {
       position: "absolute",
@@ -91,17 +92,9 @@ export default function Login() {
       paddingHorizontal: 12,
       paddingVertical: 10,
       marginBottom: 12,
-    },
-    button: {
-      marginTop: 10,
-      height: 50,
-      borderRadius: 8,
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 12,
-    },
-    buttonText: {
-      fontSize: typography.fontSizes.body,
+      color: theme.textSecondary,
+      fontFamily: typography.fonts.regular,
+      fontSize: typography.fontSizes.caption,
     },
     signUpRow: {
       flexDirection: "row",
@@ -111,42 +104,43 @@ export default function Login() {
     },
     signUpText: {
       fontSize: typography.fontSizes.caption,
+      color: theme.textSecondary,
+      fontFamily: typography.fonts.regular,
     },
     signUpLink: {
       fontSize: typography.fontSizes.caption,
       marginLeft: 4,
+      color: theme.primary,
+      fontFamily: typography.fonts.medium,
+    },
+    skipText: {
+      textAlign: "center",
+      marginTop: 10,
+      fontSize: typography.fontSizes.caption,
+      color: theme.primary,
+      fontFamily: typography.fonts.regular,
+      alignSelf: "center",
     },
   });
 
   return (
-    <SafeAreaView style={[styles.container]}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        {/* Logo */}
         <Feather
           name="zap"
           size={48}
+          W
           color={theme.onSurface}
           style={styles.logo}
         />
-
-        {/* Headline */}
-        <Text style={[styles.headline, { color: theme.onSurface }]}>
-          Intră în contul{"\n"}SportsApp
-        </Text>
-        <Text style={[styles.subhead, { color: theme.onSurface }]}>
-          Introdu emailul și parola pentru intră în cont
+        <Text style={styles.headline}>Intră în contul{"\n"}SportsApp</Text>
+        <Text style={styles.subhead}>
+          Introdu emailul și parola pentru a intra în cont
         </Text>
       </View>
       <View style={styles.card}>
         <TextInput
-          style={[
-            styles.input,
-            {
-              color: theme.textSecondary,
-              fontFamily: typography.fonts.regular,
-              fontSize: typography.fontSizes.caption,
-            },
-          ]}
+          style={styles.input}
           onChangeText={(value) => (emailRef.current = value)}
           placeholder="email@exemplu.com"
           placeholderTextColor={theme.textSecondary}
@@ -155,15 +149,7 @@ export default function Login() {
         />
         <View style={{ position: "relative" }}>
           <TextInput
-            style={[
-              styles.input,
-              {
-                color: theme.textSecondary,
-                fontFamily: typography.fonts.regular,
-                fontSize: typography.fontSizes.caption,
-                paddingRight: 40, // spațiu pentru iconiță
-              },
-            ]}
+            style={[styles.input, { paddingRight: 40 }]}
             onChangeText={(value) => (passwordRef.current = value)}
             placeholder="Parola"
             placeholderTextColor={theme.textSecondary}
@@ -188,42 +174,33 @@ export default function Login() {
               color={theme.textSecondary}
             />
           </TouchableOpacity>
-
-          <LoadingButton
-            title="Log In"
-            loading={loading}
-            onPress={handleSubmit}
-          />
-
-          {/* Sign up link */}
-          <View style={styles.signUpRow}>
-            <Text
-              style={[
-                styles.signUpText,
-                {
-                  color: theme.textSecondary,
-                  fontFamily: typography.fonts.regular,
-                },
-              ]}
-            >
-              Nu ai cont?
-            </Text>
-            <TouchableOpacity
-              onPress={() => {
-                router.push("/register");
-              }}
-            >
-              <Text
-                style={[
-                  styles.signUpLink,
-                  { color: theme.primary, fontFamily: typography.fonts.medium },
-                ]}
-              >
-                Înregistrează-te
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
+
+        <LoadingButton
+          title="Log In"
+          loading={loading}
+          onPress={handleSubmit}
+        />
+
+        <View style={styles.signUpRow}>
+          <Text style={styles.signUpText}>Nu ai cont?</Text>
+          <TouchableOpacity onPress={() => router.push("/register")}>
+            <Text style={styles.signUpLink}>Înregistrează-te</Text>
+          </TouchableOpacity>
+        </View>
+        <Text
+          style={{
+            alignSelf: "center",
+            color: theme.textSecondary,
+            fontSize: typography.fontSizes.body,
+            marginTop: 10,
+          }}
+        >
+          sau
+        </Text>
+        <TouchableOpacity onPress={() => router.push("/(tabs)")}>
+          <Text style={styles.skipText}>Intră în aplicație fără logare</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );

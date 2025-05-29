@@ -5,10 +5,10 @@ import {
   ImageSourcePropType,
   StyleSheet,
   Text,
-  useColorScheme,
   View,
 } from "react-native";
 import { SvgUri } from "react-native-svg";
+import { useTheme } from "../hooks/useTheme";
 import { Colors } from "../theme/colors";
 import { typography } from "../theme/typography";
 
@@ -26,9 +26,9 @@ const TeamCard: React.FC<TeamCardProps> = ({
   subtitle,
   watermark,
 }) => {
-  const scheme = useColorScheme();
-  const theme = scheme === "dark" ? Colors.dark : Colors.light;
-
+  const { colorScheme } = useTheme();
+  const isDarkMode = colorScheme === "dark";
+  const theme = isDarkMode ? Colors.dark : Colors.light;
   return (
     <View style={[styles.card, { backgroundColor: theme.backgroundSecondary }]}>
       {watermark && (
@@ -104,8 +104,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   logo: {
-    width: 500,
-    height: 500,
+    width: 70,
+    height: 70,
     marginTop: 15,
   },
   name: {

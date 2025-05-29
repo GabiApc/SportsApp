@@ -19,12 +19,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
-      console.log("firebase user", firebaseUser);
       if (firebaseUser) {
         setUser({
-          id: firebaseUser?.uid,
-          name: firebaseUser?.displayName,
-          email: firebaseUser?.email,
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName,
+          email: firebaseUser.email,
         });
         updateUserData(firebaseUser.uid);
 
