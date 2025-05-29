@@ -1,3 +1,4 @@
+import { useTheme } from "@/context/ThemeContext";
 import React from "react";
 import {
   ActivityIndicator,
@@ -7,7 +8,6 @@ import {
   TouchableOpacity,
   ViewStyle,
 } from "react-native";
-import { useTheme } from "../hooks/useTheme";
 import { Colors } from "../theme/colors";
 import { typography } from "../theme/typography";
 

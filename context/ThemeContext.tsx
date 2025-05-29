@@ -1,4 +1,3 @@
-// src/context/ThemeContext.tsx
 import React, {
   createContext,
   ReactNode,
@@ -6,40 +5,36 @@ import React, {
   useEffect,
   useState,
 } from "react";
-import { Appearance, ColorSchemeName } from "react-native";
+import { Appearance } from "react-native";
 
-type ColorScheme = Exclude<ColorSchemeName, "no-preference">;
+type Scheme = "light" | "dark";
 
-interface ThemeContextType {
-  colorScheme: ColorScheme;
+interface ThemeContextProps {
+  colorScheme: Scheme;
   toggleTheme: () => void;
 }
 
-const ThemeContext = createContext<ThemeContextType>({
+const ThemeContext = createContext<ThemeContextProps>({
   colorScheme: "light",
   toggleTheme: () => {},
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // track a user override (or null to follow system)
-  const [override, setOverride] = useState<ColorScheme | null>(null);
-  const [system, setSystem] = useState<ColorScheme>(
-    (Appearance.getColorScheme() as ColorScheme) || "light",
-  );
+  const system = (Appearance.getColorScheme() as Scheme) ?? "light";
+  const [colorScheme, setColorScheme] = useState<Scheme>(system);
 
-  // listen to OS changes
   useEffect(() => {
     const sub = Appearance.addChangeListener(({ colorScheme }) => {
-      if (colorScheme === "light" || colorScheme === "dark") {
-        setSystem(colorScheme);
-      }
+      // dacă n-a fost override-uit manual, reflectă schimbările OS
+      setColorScheme((prev) =>
+        prev === system ? (colorScheme as Scheme) : prev,
+      );
     });
     return () => sub.remove();
-  }, []);
+  }, [system]);
 
-  const colorScheme = override ?? system;
   const toggleTheme = () =>
-    setOverride((current) => (current === "dark" ? "light" : "dark"));
+    setColorScheme((prev) => (prev === "light" ? "dark" : "light"));
 
   return (
     <ThemeContext.Provider value={{ colorScheme, toggleTheme }}>

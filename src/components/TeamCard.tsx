@@ -1,4 +1,5 @@
 // src/components/TeamCard.tsx
+import { useTheme } from "@/context/ThemeContext";
 import React from "react";
 import {
   Image,
@@ -8,7 +9,6 @@ import {
   View,
 } from "react-native";
 import { SvgUri } from "react-native-svg";
-import { useTheme } from "../hooks/useTheme";
 import { Colors } from "../theme/colors";
 import { typography } from "../theme/typography";
 

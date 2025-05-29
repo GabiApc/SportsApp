@@ -1,6 +1,7 @@
 // src/screens/TeamsScreen.tsx (sau Index.tsx)
 import { firestore } from "@/config/firebase";
 import { useAuth } from "@/context/authContext";
+import { useTheme } from "@/context/ThemeContext";
 import { ConfirmationModal } from "@/src/components/ConfirmationModal";
 import Header from "@/src/components/Header";
 import {
@@ -8,7 +9,6 @@ import {
   TeamsSection,
 } from "@/src/components/TeamSection";
 import { useCachedTeams } from "@/src/hooks/useCachedTeams";
-import { useTheme } from "@/src/hooks/useTheme";
 import { Colors } from "@/src/theme/colors";
 import { useRouter } from "expo-router";
 import {
@@ -64,7 +64,7 @@ export default function TeamsScreen() {
     (team: SectionTeam) => {
       router.push({
         pathname: "/details/[teamId]",
-        params: { teamId: team.id },
+        params: { teamId: team.id, colorScheme: colorScheme },
       });
     },
     [router],

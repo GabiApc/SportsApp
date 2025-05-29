@@ -1,4 +1,5 @@
 // src/components/EditUserModal.tsx
+import { useTheme } from "@/context/ThemeContext";
 import { Feather } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
@@ -11,7 +12,6 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { useTheme } from "../hooks/useTheme";
 import { Colors } from "../theme/colors";
 import { typography } from "../theme/typography";
 import { hexToRgba } from "../utils/HexToRgba";

@@ -1,7 +1,6 @@
 import {
   DarkTheme as NavigationDarkTheme,
   DefaultTheme as NavigationDefaultTheme,
-  ThemeProvider,
 } from "@react-navigation/native";
 import merge from "deepmerge";
 import { useFonts } from "expo-font";
@@ -19,7 +18,7 @@ import { Colors } from "../theme/colors";
 import { typography } from "../theme/typography";
 
 import { AuthProvider } from "@/context/authContext";
-import { useTheme } from "@/src/hooks/useTheme";
+import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 
 type ExtendedPaperTheme = MD3Theme & { typography: typeof typography };
 
@@ -58,7 +57,6 @@ const StackLayout = () => {
       />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
 
-      <Stack.Screen name="details" options={{ headerShown: false }} />
       <Stack.Screen name="details/[teamId]" options={{ headerShown: false }} />
     </Stack>
   );
@@ -80,21 +78,10 @@ export default function RootLayout() {
   }
   return (
     <PaperProvider theme={paperTheme}>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : LightTheme}>
+      <ThemeProvider>
         <AuthProvider>
           <StackLayout />
         </AuthProvider>
-        {/* <Stack>
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-
-          <Stack.Screen
-            name="(tabs)"
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen name="details" options={{ headerShown: false }} />
-        </Stack> */}
       </ThemeProvider>
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
     </PaperProvider>

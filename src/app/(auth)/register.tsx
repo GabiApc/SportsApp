@@ -1,5 +1,6 @@
 // src/screens/LoginScreen.tsx
 import { useAuth } from "@/context/authContext";
+import { useTheme } from "@/context/ThemeContext";
 import LoadingButton from "@/src/components/LoadingButton";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -13,7 +14,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useTheme } from "../../hooks/useTheme";
 import { Colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
 

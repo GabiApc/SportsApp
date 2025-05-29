@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { Colors } from "../../theme/colors";
 
-import { useTheme } from "@/src/hooks/useTheme";
+import { useTheme } from "@/context/ThemeContext";
 import { StyleSheet, TouchableWithoutFeedback, View } from "react-native";
 
 export default function TabLayout() {

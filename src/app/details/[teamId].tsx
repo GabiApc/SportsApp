@@ -1,8 +1,8 @@
 // src/app/details/[teamId].tsx
+import { useTheme } from "@/context/ThemeContext";
 import HorizontalTabBar from "@/src/components/horizontalTabBar";
 import TeamCard from "@/src/components/TeamCard";
 import { useCachedTeams } from "@/src/hooks/useCachedTeams";
-import { useTheme } from "@/src/hooks/useTheme";
 import { Colors } from "@/src/theme/colors";
 import { typography } from "@/src/theme/typography";
 import { Feather } from "@expo/vector-icons";
@@ -22,7 +22,6 @@ const PremierLeagueLogo = require("../../../assets/images/logoLeague.png");
 
 export default function DetailsScreen() {
   const { colorScheme } = useTheme();
-  console.log(colorScheme);
   const isDarkMode = colorScheme === "dark";
   const theme = isDarkMode ? Colors.dark : Colors.light;
 
@@ -74,6 +73,7 @@ export default function DetailsScreen() {
       fontSize: typography.fontSizes.body,
       lineHeight: 20,
       color: theme.onBackground,
+      textAlign: "justify",
     },
     toggleText: {
       marginTop: 8,

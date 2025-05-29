@@ -1,11 +1,11 @@
 // src/components/SettingsSection.tsx
 import { auth } from "@/config/firebase";
 import { useAuth } from "@/context/authContext";
+import { useTheme } from "@/context/ThemeContext";
 import { ConfirmationModal } from "@/src/components/ConfirmationModal";
 import EditUserModal from "@/src/components/EditUserModal";
 import Header from "@/src/components/Header";
 import ProfileCard from "@/src/components/ProfileCard";
-import { useTheme } from "@/src/hooks/useTheme";
 import { Colors } from "@/src/theme/colors";
 import { typography } from "@/src/theme/typography";
 import { Feather } from "@expo/vector-icons";

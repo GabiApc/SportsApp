@@ -1,8 +1,8 @@
 // src/components/ProfileCard.tsx
+import { useTheme } from "@/context/ThemeContext";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useTheme } from "../hooks/useTheme";
 import { Colors } from "../theme/colors";
 import { typography } from "../theme/typography";
 

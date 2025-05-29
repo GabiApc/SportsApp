@@ -1,11 +1,11 @@
 import { firestore } from "@/config/firebase";
 import { useAuth } from "@/context/authContext";
+import { useTheme } from "@/context/ThemeContext";
 import Header from "@/src/components/Header";
 import {
   Team as SectionTeam,
   TeamsSection,
 } from "@/src/components/TeamSection";
-import { useTheme } from "@/src/hooks/useTheme";
 import { Colors } from "@/src/theme/colors";
 import { useRouter } from "expo-router";
 import { collection, deleteDoc, doc, onSnapshot } from "firebase/firestore";

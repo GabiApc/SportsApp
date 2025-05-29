@@ -1,8 +1,8 @@
 // src/components/HorizontalTabBar.tsx
 
+import { useTheme } from "@/context/ThemeContext";
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useTheme } from "../hooks/useTheme";
 import { Colors } from "../theme/colors";
 import { typography } from "../theme/typography";
 

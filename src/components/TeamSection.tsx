@@ -3,6 +3,7 @@ import { AntDesign } from "@expo/vector-icons";
 import React from "react";
 import { SvgUri } from "react-native-svg";
 
+import { useTheme } from "@/context/ThemeContext";
 import {
   FlatList,
   Image,
@@ -12,7 +13,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useTheme } from "../hooks/useTheme";
 import { Colors } from "../theme/colors";
 import { typography } from "../theme/typography";
 
