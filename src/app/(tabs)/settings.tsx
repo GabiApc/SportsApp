@@ -8,58 +8,75 @@ import Header from "@/src/components/Header";
 import ProfileCard from "@/src/components/ProfileCard";
 import { Colors } from "@/src/theme/colors";
 import { typography } from "@/src/theme/typography";
+import { UserType } from "@/types";
 import { Feather } from "@expo/vector-icons";
-import { signOut } from "@firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import { signOut } from "firebase/auth";
 import { doc, updateDoc } from "firebase/firestore";
 import React, { useState } from "react";
-
-import { Alert, Platform, StyleSheet, Switch, Text, View } from "react-native";
-import { ActivityIndicator } from "react-native-paper";
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from "react-native";
 
 export default function SettingsSection() {
+  const { user, setUser, updateUserData } = useAuth();
   const { colorScheme, toggleTheme } = useTheme();
-  const isDarkMode = colorScheme === "dark";
-  const theme = isDarkMode ? Colors.dark : Colors.light;
-  const [notificationsEnabled, setNotificationsEnabled] = React.useState(false);
-  const [logoutModalVisible, setLogoutModalVisible] = React.useState(false);
-  const [editVisible, setEditVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const isDark = colorScheme === "dark";
+  const theme = isDark ? Colors.dark : Colors.light;
+  const router = useRouter();
+  const USER_KEY = "@cached_user";
 
-  const { user, updateUserData } = useAuth();
-  // and then at render time:
+  const [editVisible, setEditVisible] = useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [loading, setLoading] = useState(false);
   const name = user?.name ?? "";
   const email = user?.email ?? "";
 
   const openEdit = () => setEditVisible(true);
   const closeEdit = () => setEditVisible(false);
 
-  /** Called when the user presses \"Save\" in the edit modal */
   const handleSave = async (newName: string, newEmail: string) => {
     if (!user) return;
 
-    try {
-      // 1) Update Firestore
-      const userRef = doc(firestore, "users", user.id);
-      await updateDoc(userRef, {
-        name: newName,
-        email: newEmail,
-      });
-      setLoading(true);
+    // 1) Update context + cache immediately
+    const updated: UserType = { ...user, name: newName, email: newEmail };
+    setUser(updated);
+    await AsyncStorage.setItem(USER_KEY, JSON.stringify(updated));
+    AsyncStorage.setItem(USER_KEY, JSON.stringify(updated)).catch(console.warn);
 
-      // 3) Let your AuthContext re-fetch the latest user data
-      await updateUserData(user.id);
+    setLoading(false);
+    closeEdit();
+
+    // immediately hide loader & close modal
+
+    // 2) Attempt Firestore write
+    try {
+      const ref = doc(firestore, "users", user.id);
+      await updateDoc(ref, { name: newName, email: newEmail });
     } catch (err) {
-      console.error("Error updating user data", err);
-      Alert.alert("Eroare", "Nu am putut salva modificările.");
-    } finally {
-      closeEdit();
-      setLoading(false);
+      Alert.alert(
+        "Ești offline",
+        "Modificările au fost salvate local și vor fi sincronizate când revii online.",
+      );
+    }
+
+    // 3) Try to refresh from server if online
+    try {
+      await updateUserData(user.id);
+    } catch {
+      // ignore
     }
   };
-  const router = useRouter();
+
   const handleLogout = async () => {
-    // logică de logout
     await signOut(auth);
     setLogoutModalVisible(false);
     router.replace("/(tabs)");
@@ -106,7 +123,7 @@ export default function SettingsSection() {
       alignItems: "center",
     },
     toggle: {
-      backgroundColor: isDarkMode ? theme.primary : theme.borderDark,
+      backgroundColor: isDark ? theme.primary : theme.borderDark,
       width: 49,
       height: 27,
       borderRadius: 15,
@@ -119,7 +136,7 @@ export default function SettingsSection() {
     toggle2: {
       backgroundColor: notificationsEnabled
         ? theme.primary
-        : isDarkMode
+        : isDark
         ? theme.textSecondary
         : theme.borderDark,
       width: 49,
@@ -137,50 +154,49 @@ export default function SettingsSection() {
       alignItems: "center",
     },
   });
+
   if (loading) {
     return (
-      <View style={styles.loader}>
+      <View style={[styles.loader, { backgroundColor: theme.background }]}>
         <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* Logout confirmation */}
       <ConfirmationModal
         visible={logoutModalVisible}
         title="Ești sigur că vrei să te deloghezi?"
         confirmText="Nu"
         cancelText="Da"
-        onConfirm={() => {
-          // logică de logout
-          setLogoutModalVisible(false);
-        }}
-        onCancel={() => handleLogout()}
+        onConfirm={() => setLogoutModalVisible(false)}
+        onCancel={handleLogout}
       />
 
+      {/* Edit profile modal */}
       <EditUserModal
         visible={editVisible}
-        initialName={user?.name || name}
-        initialEmail={user?.email || email}
+        initialName={name}
+        initialEmail={email}
         onSave={handleSave}
         onCancel={closeEdit}
       />
+
+      {/* Header with logout icon */}
       <Header
         onProfilePress={() => setLogoutModalVisible(true)}
-        onSearchChange={(q) => console.log("Căutare:", q)}
         showSearch={false}
         iconName="log-out"
-        iconState={!user ? false : true}
+        iconState={Boolean(user)}
         buttonStyle={{ backgroundColor: "transparent" }}
       />
-      {user && (
-        <ProfileCard
-          name={user.name}
-          email={user.email}
-          onEditPress={openEdit}
-        />
-      )}
 
+      {/* Profile info */}
+      {user && <ProfileCard name={name} email={email} onEditPress={openEdit} />}
+
+      {/* Settings toggles */}
       <View style={styles.settings}>
         <Text style={[styles.header, { color: theme.onBackground }]}>
           Setările contului
@@ -201,18 +217,18 @@ export default function SettingsSection() {
 
           {Platform.OS === "ios" ? (
             <Switch
-              value={isDarkMode}
+              value={isDark}
               onValueChange={toggleTheme}
               trackColor={{ false: theme.borderDark, true: theme.primary }}
-              thumbColor={isDarkMode ? theme.onSurface : theme.onSurface}
+              thumbColor={isDark ? theme.onSurface : theme.onSurface}
             />
           ) : (
             <View style={styles.toggle}>
               <Switch
-                value={isDarkMode}
+                value={isDark}
                 onValueChange={toggleTheme}
                 trackColor={{ false: theme.borderDark, true: theme.primary }}
-                thumbColor={isDarkMode ? theme.onSurface : theme.onSurface}
+                thumbColor={isDark ? theme.onSurface : theme.onSurface}
               />
             </View>
           )}
@@ -224,7 +240,7 @@ export default function SettingsSection() {
               { backgroundColor: theme.backgroundSecondary },
             ]}
           >
-            <Feather name="moon" size={20} color={theme.textSecondary} />
+            <Feather name="bell" size={20} color={theme.textSecondary} />
           </View>
           <Text style={[styles.label, { color: theme.onBackground }]}>
             Permite notificări
@@ -245,7 +261,7 @@ export default function SettingsSection() {
                 value={notificationsEnabled}
                 onValueChange={setNotificationsEnabled}
                 trackColor={{
-                  false: isDarkMode ? theme.textSecondary : theme.borderDark,
+                  false: isDark ? theme.textSecondary : theme.borderDark,
                   true: theme.primary,
                 }}
                 thumbColor={

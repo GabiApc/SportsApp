@@ -9,11 +9,14 @@ import {
 } from "@/src/components/TeamSection";
 import { Colors } from "@/src/theme/colors";
 import { typography } from "@/src/theme/typography";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { collection, deleteDoc, doc, onSnapshot } from "firebase/firestore";
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const CACHE_KEY = "@cached_favorites";
 
 export default function Saved() {
   const { user } = useAuth();
@@ -22,21 +25,9 @@ export default function Saved() {
   const router = useRouter();
 
   const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.background,
-    },
-    loader: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    section: {
-      flex: 1,
-      width: "100%",
-      paddingHorizontal: 16,
-      marginBottom: 140,
-    },
+    container: { flex: 1, backgroundColor: theme.background },
+    loader: { flex: 1, justifyContent: "center", alignItems: "center" },
+    section: { flex: 1, paddingHorizontal: 16, marginBottom: 140 },
     messageContainer: {
       flex: 1,
       justifyContent: "center",
@@ -53,31 +44,39 @@ export default function Saved() {
 
   const [favorites, setFavorites] = useState<SectionTeam[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // filter by search query
-  const filteredFavorites = favorites.filter((team) =>
-    team.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
-  );
+  // 1) On mount, load cache first
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(CACHE_KEY);
+        if (raw) {
+          setFavorites(JSON.parse(raw));
+        }
+      } catch (e) {
+        console.warn("Error loading cached favorites", e);
+      } finally {
+        // keep loading=true until Firestore arrives
+      }
+    })();
+  }, [user]);
 
+  // 2) Then subscribe to Firestore
   useEffect(() => {
     if (!user) {
       setFavorites([]);
       setLoading(false);
       return;
     }
-    const favCol = collection(firestore, "users", user.id, "favorites");
-    const unsubscribe = onSnapshot(
-      favCol,
-      (snapshot) => {
-        const favs: SectionTeam[] = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data() as {
-            name: string;
-            logoUri: string;
-            leagueInfo?: string;
-          };
+    const col = collection(firestore, "users", user.id, "favorites");
+    const unsub = onSnapshot(
+      col,
+      async (snap) => {
+        const favs: SectionTeam[] = snap.docs.map((d) => {
+          const data = d.data() as any;
           return {
-            id: docSnap.id,
+            id: d.id,
             name: data.name,
             logoUri: data.logoUri,
             leagueInfo: data.leagueInfo ?? "",
@@ -85,16 +84,26 @@ export default function Saved() {
           };
         });
         setFavorites(favs);
+        // overwrite cache
+        try {
+          await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(favs));
+        } catch (e) {
+          console.warn("Error saving favorites to cache", e);
+        }
         setLoading(false);
       },
-      (error) => {
-        console.error("Error loading favorites:", error);
-        Alert.alert("Eroare", "Nu s-au putut încărca favoritele.");
+      (err) => {
+        console.error("Firestore error", err);
         setLoading(false);
+        Alert.alert("Eroare", "Nu s-au putut încărca favoritele.");
       },
     );
-    return () => unsubscribe();
+    return () => unsub();
   }, [user]);
+
+  const filtered = favorites.filter((t) =>
+    t.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+  );
 
   const onTeamPress = useCallback(
     (team: SectionTeam) => {
@@ -105,18 +114,13 @@ export default function Saved() {
     },
     [router],
   );
-
   const toggleFav = useCallback(
     async (team: SectionTeam) => {
       if (!user) {
-        Alert.alert(
-          "Autentificare necesară",
-          "Trebuie să fii logat pentru a modifica favoritele.",
-        );
+        Alert.alert("Autentificare necesară", "Te rugăm să te loghezi.");
         return;
       }
-      const favDoc = doc(firestore, "users", user.id, "favorites", team.id);
-      await deleteDoc(favDoc);
+      await deleteDoc(doc(firestore, "users", user.id, "favorites", team.id));
     },
     [user],
   );
@@ -134,7 +138,7 @@ export default function Saved() {
       <Header
         onProfilePress={() => {}}
         onSearchChange={setSearchQuery}
-        showSearch={user && filteredFavorites.length > 0 ? true : false}
+        showSearch={Boolean(user && favorites.length)}
         iconName="user"
         iconState={Boolean(user)}
       />
@@ -143,19 +147,19 @@ export default function Saved() {
         {!user ? (
           <View style={styles.messageContainer}>
             <Text style={styles.messageText}>
-              Trebuie să fii logat ca să vezi echipele preferate.
+              Trebuie să fii logat ca să vezi favoritele.
             </Text>
           </View>
-        ) : filteredFavorites.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <View style={styles.messageContainer}>
             <Text style={styles.messageText}>
-              Nu ai încă echipe salvate la favorite.
+              Nu ai echipe în lista de favorite.
             </Text>
           </View>
         ) : (
           <TeamsSection
             title="Echipe preferate"
-            teams={filteredFavorites}
+            teams={filtered}
             onPressTeam={onTeamPress}
             onToggleFavorite={toggleFav}
           />

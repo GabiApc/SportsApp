@@ -11,7 +11,10 @@ import {
 } from "@/src/components/TeamSection";
 import { useCachedTeams } from "@/src/hooks/useCachedTeams";
 import { Colors } from "@/src/theme/colors";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import NetInfo from "@react-native-community/netinfo";
 import { useRouter } from "expo-router";
+
 import {
   collection,
   deleteDoc,
@@ -20,15 +23,25 @@ import {
   setDoc,
 } from "firebase/firestore";
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+
+const FAVORITES_STORAGE_KEY = "@cached_favorites";
 
 export default function TeamsScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const { colorScheme } = useTheme();
   const theme = colorScheme === "dark" ? Colors.dark : Colors.light;
+  const [isConnected, setIsConnected] = useState<boolean>(true);
 
-  // full list from cache
+  useEffect(() => {
+    // subscribe to network changes
+    const sub = NetInfo.addEventListener((state) => {
+      setIsConnected(!!state.isConnected);
+    });
+    return () => sub();
+  }, []);
+  // full list from cache or API
   const { teams: apiTeams, loading } = useCachedTeams();
 
   // search query state
@@ -37,22 +50,69 @@ export default function TeamsScreen() {
 
   // favorites from Firestore
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
+  // also keep full SectionTeam[] for local cache
+  const [favorites, setFavorites] = useState<SectionTeam[]>([]);
 
+  // subscribe to Firestore favorites
   useEffect(() => {
     if (!user) {
       setFavIds(new Set());
+      setFavorites([]);
       return;
     }
     const favCol = collection(firestore, "users", user.id, "favorites");
     const unsub = onSnapshot(favCol, (snap) => {
       const ids = new Set<string>();
-      snap.forEach((d) => ids.add(d.id));
+      const favs: SectionTeam[] = [];
+      snap.forEach((d) => {
+        ids.add(d.id);
+        const data = d.data() as {
+          name: string;
+          logoUri: string;
+          leagueInfo?: string;
+        };
+        favs.push({
+          id: d.id,
+          name: data.name,
+          logoUri: data.logoUri,
+          leagueInfo: data.leagueInfo ?? "",
+          favorited: true,
+        });
+      });
       setFavIds(ids);
+      setFavorites(favs);
     });
     return () => unsub();
-  }, [user]);
+  }, [user, favorites.length]);
 
-  // map API → SectionTeam
+  // persist favorites list to AsyncStorage whenever it changes
+  useEffect(() => {
+    AsyncStorage.setItem(
+      FAVORITES_STORAGE_KEY,
+      JSON.stringify(favorites),
+    ).catch(console.warn);
+  }, [favorites]);
+
+  // on mount, load cached favorites if Firestore is empty or offline
+  useEffect(() => {
+    (async () => {
+      if (!user) {
+        return;
+      }
+      try {
+        const raw = await AsyncStorage.getItem(FAVORITES_STORAGE_KEY);
+        if (raw && favorites.length === 0) {
+          setFavorites(JSON.parse(raw));
+          // also update favIds so UI toggles correctly
+          setFavIds(new Set(JSON.parse(raw).map((t: SectionTeam) => t.id)));
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, [user, favorites.length]);
+
+  // map API → SectionTeam for display
   const sectionTeams: SectionTeam[] = apiTeams.map((t) => ({
     id: t.idTeam,
     name: t.strTeam,
@@ -61,12 +121,11 @@ export default function TeamsScreen() {
     favorited: favIds.has(t.idTeam),
   }));
 
-  // filter by search query (case-insensitive substring)
+  // filter by search query
   const filteredTeams = sectionTeams.filter((team) =>
     team.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
   );
 
-  // navigation to details
   const onTeamPress = useCallback(
     (team: SectionTeam) => {
       router.push({
@@ -77,7 +136,6 @@ export default function TeamsScreen() {
     [router],
   );
 
-  // toggle favorite
   const [modalVisible, setModalVisible] = useState(false);
   const toggleFav = useCallback(
     async (team: SectionTeam) => {
@@ -113,7 +171,17 @@ export default function TeamsScreen() {
     router.push("/login");
   };
   const handleCancelLogin = () => setModalVisible(false);
-
+  // first‐run offline + no cache → friendly message
+  if (!loading && filteredTeams.length === 0 && !isConnected) {
+    return (
+      <View style={[styles(theme).loader, { padding: 20 }]}>
+        <Text style={{ color: theme.textSecondary, textAlign: "center" }}>
+          Nu ai internet și nu există date în cache.{"\n"}
+          Verifică-ți conexiunea și reîncarcă aplicația.
+        </Text>
+      </View>
+    );
+  }
   return (
     <View style={styles(theme).container}>
       <Toast
@@ -128,15 +196,12 @@ export default function TeamsScreen() {
         onConfirm={handleConfirmLogin}
         onCancel={handleCancelLogin}
       />
-
-      {/* Pass `setSearchQuery` into Header so typing there updates our state */}
       <Header
         onProfilePress={() => {}}
         onSearchChange={setSearchQuery}
         iconName="user"
         iconState={Boolean(user)}
       />
-
       <View style={styles(theme).section}>
         <TeamsSection
           title="Echipe populare"
