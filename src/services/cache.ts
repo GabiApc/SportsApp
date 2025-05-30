@@ -8,11 +8,11 @@ import { fetchLeagueTable, fetchTeamsByLeague } from "./sportsApi";
 
 const LIST_KEY = "@cached_teams";
 const TIMESTAMP_KEY = "@cached_teams_timestamp";
-const CACHE_TTL = 1000 * 60 * 60; // 1 hour
+const CACHE_TTL = 1000 * 60 * 60 * 24; // 1 hour
 
 const FAVORITES_KEY = "@cached_favorites";
 const FAVORITES_TS_KEY = "@cached_favorites_ts";
-const FAV_TTL = 1000 * 60 * 30; // 30 minutes
+const FAV_TTL = 1000 * 60 * 60 * 24; // 30 minutes
 
 /**
  * Prefetch and cache full teams list on app start

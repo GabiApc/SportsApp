@@ -9,20 +9,13 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.company.app",
-      "infoPlist": {
-        "NSUserNotificationUsageDescription": "Pentru a primi alerte despre meciuri și scoruri."
-      }
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FF5050"
-      },
-      "googleServicesFile": "./google-services.json",
-      "edgeToEdgeEnabled": true,
-      "package": "com.gabiapg.SportsApp"
+      }
     },
 
     "web": {
