@@ -17,6 +17,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 
 const CACHE_KEY = "@cached_favorites";
+const USER_KEY = "@cached_user";
 
 export default function Saved() {
   const { user } = useAuth();
@@ -46,14 +47,30 @@ export default function Saved() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // 1) load cached favorites on mount
+  // 1) Load cached favorites on mount, based only on user in cache
   useEffect(() => {
-    if (!user) return;
     (async () => {
-      const cached = await getCachedFavorites();
-      setFavorites(cached);
+      try {
+        const userJson = await AsyncStorage.getItem(USER_KEY);
+        if (!userJson) {
+          setLoading(false);
+          return;
+        }
+        const { id: cachedUserId } = JSON.parse(userJson) as { id: string };
+        if (!cachedUserId) {
+          setLoading(false);
+          return;
+        }
+        // Load favorites from cache service or AsyncStorage
+        const cachedFavs = await getCachedFavorites();
+        setFavorites(cachedFavs);
+      } catch (e) {
+        console.warn("Error loading cached favorites:", e);
+      } finally {
+        setLoading(false);
+      }
     })();
-  }, [user]);
+  }, []);
 
   // 2) Then subscribe to Firestore
   useEffect(() => {
