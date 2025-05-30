@@ -33,16 +33,6 @@
           "resizeMode": "contain",
           "backgroundColor": "#FF5050"
         }
-      ],
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "enableProguardInReleaseBuilds": false,
-            "compileSdkVersion": 33,
-            "targetSdkVersion": 33
-          }
-        }
       ]
     ],
     "experiments": {
