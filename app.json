@@ -20,6 +20,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FF5050"
       },
+      "googleServicesFile": "./google-services.json",
       "edgeToEdgeEnabled": true,
       "package": "com.gabiapg.SportsApp"
     },
@@ -38,6 +39,16 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#FF5050"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": false,
+            "compileSdkVersion": 33,
+            "targetSdkVersion": 33
+          }
         }
       ]
     ],

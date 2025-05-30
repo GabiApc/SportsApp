@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "997288060693",
+    "project_id": "sports-explorer-698cd",
+    "storage_bucket": "sports-explorer-698cd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:997288060693:android:ad28ca898c6c45e2b22b1c",
+        "android_client_info": {
+          "package_name": "com.sportsapp.ro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBXoYBMRf3cx5nkpV2Fcsz_nPaIrSESx3c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
