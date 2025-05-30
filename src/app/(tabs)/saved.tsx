@@ -7,6 +7,7 @@ import {
   Team as SectionTeam,
   TeamsSection,
 } from "@/src/components/TeamSection";
+import { getCachedFavorites } from "@/src/services/cache";
 import { Colors } from "@/src/theme/colors";
 import { typography } from "@/src/theme/typography";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -14,7 +15,6 @@ import { useRouter } from "expo-router";
 import { collection, deleteDoc, doc, onSnapshot } from "firebase/firestore";
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 const CACHE_KEY = "@cached_favorites";
 
@@ -46,19 +46,12 @@ export default function Saved() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // 1) On mount, load cache first
+  // 1) load cached favorites on mount
   useEffect(() => {
+    if (!user) return;
     (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(CACHE_KEY);
-        if (raw) {
-          setFavorites(JSON.parse(raw));
-        }
-      } catch (e) {
-        console.warn("Error loading cached favorites", e);
-      } finally {
-        // keep loading=true until Firestore arrives
-      }
+      const cached = await getCachedFavorites();
+      setFavorites(cached);
     })();
   }, [user]);
 
@@ -134,7 +127,7 @@ export default function Saved() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <Header
         onProfilePress={() => {}}
         onSearchChange={setSearchQuery}
@@ -165,6 +158,6 @@ export default function Saved() {
           />
         )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }

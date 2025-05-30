@@ -1,4 +1,17 @@
 // src/screens/TeamsScreen.tsx
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import NetInfo from "@react-native-community/netinfo";
+import { useRouter } from "expo-router";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  setDoc,
+} from "firebase/firestore";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+
 import { firestore } from "@/config/firebase";
 import { useAuth } from "@/context/authContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -11,19 +24,8 @@ import {
 } from "@/src/components/TeamSection";
 import { useCachedTeams } from "@/src/hooks/useCachedTeams";
 import { Colors } from "@/src/theme/colors";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import NetInfo from "@react-native-community/netinfo";
-import { useRouter } from "expo-router";
 
-import {
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  setDoc,
-} from "firebase/firestore";
-import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { getCachedFavorites } from "@/src/services/cache";
 
 const FAVORITES_STORAGE_KEY = "@cached_favorites";
 
@@ -32,32 +34,43 @@ export default function TeamsScreen() {
   const router = useRouter();
   const { colorScheme } = useTheme();
   const theme = colorScheme === "dark" ? Colors.dark : Colors.light;
-  const [isConnected, setIsConnected] = useState<boolean>(true);
 
+  // connectivity
+  const [isConnected, setIsConnected] = useState(true);
   useEffect(() => {
-    // subscribe to network changes
-    const sub = NetInfo.addEventListener((state) => {
-      setIsConnected(!!state.isConnected);
-    });
+    const sub = NetInfo.addEventListener((s) =>
+      setIsConnected(!!s.isConnected),
+    );
     return () => sub();
   }, []);
-  // full list from cache or API
+
+  // popular teams
   const { teams: apiTeams, loading } = useCachedTeams();
 
-  // search query state
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  // search + toast + login modal
+  const [searchQuery, setSearchQuery] = useState("");
   const [toastVisible, setToastVisible] = useState(false);
+  const [loginModal, setLoginModal] = useState(false);
 
-  // favorites from Firestore
-  const [favIds, setFavIds] = useState<Set<string>>(new Set());
-  // also keep full SectionTeam[] for local cache
+  // favorites state + ids
   const [favorites, setFavorites] = useState<SectionTeam[]>([]);
+  const [favIds, setFavIds] = useState<Set<string>>(new Set());
 
-  // subscribe to Firestore favorites
+  // 1) load cached favorites on mount
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const cached = await getCachedFavorites();
+      setFavorites(cached);
+      setFavIds(new Set(cached.map((t) => t.id)));
+    })();
+  }, [user]);
+
+  // 2) subscribe to Firestore favorites live
   useEffect(() => {
     if (!user) {
-      setFavIds(new Set());
       setFavorites([]);
+      setFavIds(new Set());
       return;
     }
     const favCol = collection(firestore, "users", user.id, "favorites");
@@ -66,11 +79,7 @@ export default function TeamsScreen() {
       const favs: SectionTeam[] = [];
       snap.forEach((d) => {
         ids.add(d.id);
-        const data = d.data() as {
-          name: string;
-          logoUri: string;
-          leagueInfo?: string;
-        };
+        const data = d.data() as any;
         favs.push({
           id: d.id,
           name: data.name,
@@ -83,9 +92,9 @@ export default function TeamsScreen() {
       setFavorites(favs);
     });
     return () => unsub();
-  }, [user, favorites.length]);
+  }, [user]);
 
-  // persist favorites list to AsyncStorage whenever it changes
+  // 3) persist whenever favorites change
   useEffect(() => {
     AsyncStorage.setItem(
       FAVORITES_STORAGE_KEY,
@@ -93,26 +102,7 @@ export default function TeamsScreen() {
     ).catch(console.warn);
   }, [favorites]);
 
-  // on mount, load cached favorites if Firestore is empty or offline
-  useEffect(() => {
-    (async () => {
-      if (!user) {
-        return;
-      }
-      try {
-        const raw = await AsyncStorage.getItem(FAVORITES_STORAGE_KEY);
-        if (raw && favorites.length === 0) {
-          setFavorites(JSON.parse(raw));
-          // also update favIds so UI toggles correctly
-          setFavIds(new Set(JSON.parse(raw).map((t: SectionTeam) => t.id)));
-        }
-      } catch {
-        // ignore
-      }
-    })();
-  }, [user, favorites.length]);
-
-  // map API → SectionTeam for display
+  // map & filter
   const sectionTeams: SectionTeam[] = apiTeams.map((t) => ({
     id: t.idTeam,
     name: t.strTeam,
@@ -120,27 +110,25 @@ export default function TeamsScreen() {
     logoUri: t.strBadge,
     favorited: favIds.has(t.idTeam),
   }));
-
-  // filter by search query
   const filteredTeams = sectionTeams.filter((team) =>
     team.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
   );
 
+  // navigation
   const onTeamPress = useCallback(
-    (team: SectionTeam) => {
+    (team: SectionTeam) =>
       router.push({
         pathname: "/details/[teamId]",
         params: { teamId: team.id },
-      });
-    },
+      }),
     [router],
   );
 
-  const [modalVisible, setModalVisible] = useState(false);
+  // toggle favorite
   const toggleFav = useCallback(
     async (team: SectionTeam) => {
       if (!user) {
-        setModalVisible(true);
+        setLoginModal(true);
         return;
       }
       const ref = doc(firestore, "users", user.id, "favorites", team.id);
@@ -166,13 +154,8 @@ export default function TeamsScreen() {
     );
   }
 
-  const handleConfirmLogin = () => {
-    setModalVisible(false);
-    router.push("/login");
-  };
-  const handleCancelLogin = () => setModalVisible(false);
-  // first‐run offline + no cache → friendly message
-  if (!loading && filteredTeams.length === 0 && !isConnected) {
+  // first-run offline + no data
+  if (!loading && !isConnected && filteredTeams.length === 0) {
     return (
       <View style={[styles(theme).loader, { padding: 20 }]}>
         <Text style={{ color: theme.textSecondary, textAlign: "center" }}>
@@ -182,6 +165,7 @@ export default function TeamsScreen() {
       </View>
     );
   }
+
   return (
     <View style={styles(theme).container}>
       <Toast
@@ -190,11 +174,14 @@ export default function TeamsScreen() {
         onHide={() => setToastVisible(false)}
       />
       <ConfirmationModal
-        visible={modalVisible}
+        visible={loginModal}
         title="Trebuie să fii logat pentru a salva la favorite"
         message="Vrei să te loghezi?"
-        onConfirm={handleConfirmLogin}
-        onCancel={handleCancelLogin}
+        onConfirm={() => {
+          setLoginModal(false);
+          router.push("/login");
+        }}
+        onCancel={() => setLoginModal(false)}
       />
       <Header
         onProfilePress={() => {}}

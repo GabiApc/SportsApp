@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
 import { doc, updateDoc } from "firebase/firestore";
 import React, { useState } from "react";
+
 import {
   ActivityIndicator,
   Alert,
@@ -199,7 +200,7 @@ export default function SettingsSection() {
       {/* Settings toggles */}
       <View style={styles.settings}>
         <Text style={[styles.header, { color: theme.onBackground }]}>
-          Setările contului
+          Setările aplicatiei
         </Text>
 
         <View style={styles.row}>
@@ -233,44 +234,46 @@ export default function SettingsSection() {
             </View>
           )}
         </View>
-        <View style={styles.row}>
-          <View
-            style={[
-              styles.iconCircle,
-              { backgroundColor: theme.backgroundSecondary },
-            ]}
-          >
-            <Feather name="bell" size={20} color={theme.textSecondary} />
-          </View>
-          <Text style={[styles.label, { color: theme.onBackground }]}>
-            Permite notificări
-          </Text>
+        {user && (
+          <View style={styles.row}>
+            <View
+              style={[
+                styles.iconCircle,
+                { backgroundColor: theme.backgroundSecondary },
+              ]}
+            >
+              <Feather name="bell" size={20} color={theme.textSecondary} />
+            </View>
+            <Text style={[styles.label, { color: theme.onBackground }]}>
+              Permite notificări
+            </Text>
 
-          {Platform.OS === "ios" ? (
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
-              trackColor={{ false: theme.textSecondary, true: theme.primary }}
-              thumbColor={
-                notificationsEnabled ? theme.onSurface : theme.onSurface
-              }
-            />
-          ) : (
-            <View style={styles.toggle2}>
+            {Platform.OS === "ios" ? (
               <Switch
                 value={notificationsEnabled}
                 onValueChange={setNotificationsEnabled}
-                trackColor={{
-                  false: isDark ? theme.textSecondary : theme.borderDark,
-                  true: theme.primary,
-                }}
+                trackColor={{ false: theme.textSecondary, true: theme.primary }}
                 thumbColor={
                   notificationsEnabled ? theme.onSurface : theme.onSurface
                 }
               />
-            </View>
-          )}
-        </View>
+            ) : (
+              <View style={styles.toggle2}>
+                <Switch
+                  value={notificationsEnabled}
+                  onValueChange={setNotificationsEnabled}
+                  trackColor={{
+                    false: isDark ? theme.textSecondary : theme.borderDark,
+                    true: theme.primary,
+                  }}
+                  thumbColor={
+                    notificationsEnabled ? theme.onSurface : theme.onSurface
+                  }
+                />
+              </View>
+            )}
+          </View>
+        )}
       </View>
     </View>
   );

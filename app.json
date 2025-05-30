@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.company.app",
+      "infoPlist": {
+        "NSUserNotificationUsageDescription": "Pentru a primi alerte despre meciuri și scoruri."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,6 +23,7 @@
       "edgeToEdgeEnabled": true,
       "package": "com.gabiapg.SportsApp"
     },
+
     "web": {
       "bundler": "metro",
       "output": "static",
