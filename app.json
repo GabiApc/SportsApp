@@ -16,7 +16,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FF5050"
       },
-      "googleServicesFile": "./path/to/google-services.json",
+      "googleServicesFile": "./google-services.json",
       "package": "com.gabiapg.SportsApp"
     },
     "web": {
