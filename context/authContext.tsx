@@ -1,5 +1,4 @@
 import { auth, firestore } from "@/config/firebase";
-import { registerForPushNotificationsAsync } from "@/src/services/notifications";
 import { AuthContextType, UserType } from "@/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
@@ -66,14 +65,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           email: data.email || firebaseUser.email || "",
         };
         setUser(u);
-        if (firebaseUser.uid) {
-          try {
-            await registerForPushNotificationsAsync(firebaseUser.uid);
-            console.log("Token salvat în Firestore");
-          } catch (err) {
-            console.warn("Nu am putut salva token-ul:", err);
-          }
-        }
+
         await AsyncStorage.setItem(USER_KEY, JSON.stringify(u));
         router.replace("/(tabs)");
       } else {

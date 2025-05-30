@@ -67,15 +67,12 @@ function AppContent() {
       if (json) {
         const cached: { id: string } = JSON.parse(json);
         if (cached.id) {
-          console.log("Prefetch from cache:", cached.id);
-
           prefetchFavorites(cached.id);
           return;
         }
       }
       // 2) Dacă nu e în cache, încearcă din auth
       if (user?.id) {
-        console.log("Prefetch from auth:", user.id);
         prefetchFavorites(user.id);
       }
     })();

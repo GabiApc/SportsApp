@@ -26,11 +26,12 @@ import { useCachedTeams } from "@/src/hooks/useCachedTeams";
 import { Colors } from "@/src/theme/colors";
 
 import { getCachedFavorites } from "@/src/services/cache";
+import { registerForPushNotificationsAsync } from "@/src/services/notifications";
 
 const FAVORITES_STORAGE_KEY = "@cached_favorites";
 
 export default function TeamsScreen() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const router = useRouter();
   const { colorScheme } = useTheme();
   const theme = colorScheme === "dark" ? Colors.dark : Colors.light;
@@ -43,7 +44,12 @@ export default function TeamsScreen() {
     );
     return () => sub();
   }, []);
-
+  useEffect(() => {
+    registerForPushNotificationsAsync()
+      .then(setExpoPushToken)
+      .catch(console.warn);
+    // Adaugă listener-ele notif, etc.
+  }, []);
   // popular teams
   const { teams: apiTeams, loading } = useCachedTeams();
 
@@ -73,6 +79,7 @@ export default function TeamsScreen() {
       setFavIds(new Set());
       return;
     }
+
     const favCol = collection(firestore, "users", user.id, "favorites");
     const unsub = onSnapshot(favCol, (snap) => {
       const ids = new Set<string>();
@@ -219,3 +226,8 @@ const styles = (theme: typeof Colors.light | typeof Colors.dark) =>
       alignItems: "center",
     },
   });
+function setExpoPushToken(token: string) {
+  // Optionally, you could store the token in state, context, or send it to your backend.
+  // For now, just log it for debugging.
+  console.log("Expo push token:", token);
+}

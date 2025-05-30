@@ -20,6 +20,7 @@ export type UserType = {
   name: string;
   surname?: string;
   email: string;
+  expoPushToken?: string;
 };
 export interface ApiTeam {
   idTeam: string;
