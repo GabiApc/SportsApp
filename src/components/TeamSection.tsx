@@ -8,10 +8,13 @@ import {
   FlatList,
   Image,
   ListRenderItemInfo,
+  Platform,
+  StyleProp,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  ViewStyle,
 } from "react-native";
 import { Colors } from "../theme/colors";
 import { typography } from "../theme/typography";
@@ -25,14 +28,16 @@ export type Team = {
 };
 
 export type TeamsSectionProps = {
-  /** Titlul secțiunii */
+  /** Titlul secțiunii (opțional) */
   title?: string;
-  /** Datele echipelor */
+  /** Array-ul de echipe */
   teams: Team[];
-  /** Când se apasă pe cardul unei echipe */
+  /** Callback când apeși pe cardul unei echipe */
   onPressTeam?: (team: Team) => void;
-  /** Când se apasă pe butonul de favorite */
+  /** Callback când apeși pe butonul de favorite */
   onToggleFavorite?: (team: Team) => void;
+  /** Stil suplimentar pe FlatList, dacă ai nevoie (opțional) */
+  listStyle?: StyleProp<ViewStyle>;
 };
 
 export const TeamsSection: React.FC<TeamsSectionProps> = ({
@@ -40,13 +45,17 @@ export const TeamsSection: React.FC<TeamsSectionProps> = ({
   teams,
   onPressTeam,
   onToggleFavorite,
+  listStyle,
 }) => {
+  // Obținem tema (dark/light)
   const { colorScheme } = useTheme();
   const isDarkMode = colorScheme === "dark";
   const theme = isDarkMode ? Colors.dark : Colors.light;
 
+  // Cream stilurile în funcție de temă
   const styles = createStyles(theme);
 
+  // Fiecare item din listă
   const renderItem = ({ item }: ListRenderItemInfo<Team>) => (
     <TouchableOpacity
       activeOpacity={0.8}
@@ -79,7 +88,7 @@ export const TeamsSection: React.FC<TeamsSectionProps> = ({
         }}
       >
         <AntDesign
-          name={item.favorited ? "heart" : "heart"}
+          name={item.favorited ? "heart" : "hearto"}
           size={21}
           color={item.favorited ? theme.primary : theme.disabled}
         />
@@ -89,7 +98,10 @@ export const TeamsSection: React.FC<TeamsSectionProps> = ({
 
   return (
     <View style={styles.container}>
+      {/* Titlul secțiunii */}
       <Text style={styles.header}>{title}</Text>
+
+      {/* FlatList cu scroll intern pe Web */}
       <FlatList
         data={teams}
         keyExtractor={(item) => item.id}
@@ -97,6 +109,19 @@ export const TeamsSection: React.FC<TeamsSectionProps> = ({
         ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
         contentContainerStyle={{ paddingBottom: 16 }}
         showsVerticalScrollIndicator={false}
+        /**
+         * Stiluri pentru comportamentul scroll:
+         * 1) flex: 1    => lista ocupă tot spațiul rămas în container (sub header)
+         * 2) pe Web: overflow: "auto" + display: "flex" pentru scroll intern
+         * 3) listStyle => un stil suplimentar, dacă vrei
+         */
+        style={[
+          { flex: 1 },
+          Platform.OS === "web"
+            ? { overflow: "auto" as const, display: "flex" }
+            : {},
+          listStyle as any,
+        ]}
       />
     </View>
   );
@@ -105,6 +130,7 @@ export const TeamsSection: React.FC<TeamsSectionProps> = ({
 const createStyles = (theme: typeof Colors.light) =>
   StyleSheet.create({
     container: {
+      flex: 1, // containerul își ia înălțimea din părinte
       marginTop: 16,
       paddingHorizontal: 16,
     },
