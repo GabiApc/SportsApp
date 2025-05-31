@@ -16,12 +16,11 @@ import {
   Team as SectionTeam,
   TeamsSection,
 } from "@/src/components/TeamSection";
-import { getCachedFavorites } from "@/src/services/cache";
 import { Colors } from "@/src/theme/colors";
 import { typography } from "@/src/theme/typography";
 
 // --- Constants ---
-const CACHE_KEY = "@cached_favorites";
+const CACHE_KEY_PREFIX = "@cached_favorites_";
 const USER_KEY = "@cached_user";
 
 // --- Styles ---
@@ -86,25 +85,41 @@ export default function Saved() {
         }
 
         if (!effectiveUser) {
-          return; // fără user, nu încărcăm favorite
+          // fără user, nu încărcăm favorite → ridicăm loading
+          setFavorites([]);
+          setLoading(false);
+          return;
         }
 
         // Aici citim favoritele în funcție de userId
-        const cachedFavs = await getCachedFavorites(effectiveUser.id);
-        setFavorites(cachedFavs);
+        const CACHE_KEY = CACHE_KEY_PREFIX + effectiveUser.id;
+        const cachedFavs = await AsyncStorage.getItem(CACHE_KEY);
+        if (cachedFavs) {
+          setFavorites(JSON.parse(cachedFavs));
+        } else {
+          setFavorites([]);
+        }
       } catch (e) {
         console.warn("Eroare la încărcarea favorite din cache:", e);
+      } finally {
+        // Indiferent de rezultat, ridicăm loading
+        setLoading(false);
       }
     })();
   }, [user, setUser]);
 
   // --- Firestore subscription for favorites ---
   useEffect(() => {
+    // mai întâi, anulăm orice abonament anterior
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
       unsubscribeRef.current = () => {};
     }
-    if (!user || !isConnected) return;
+
+    // dacă nu există user sau nu avem internet, nu ne abonăm
+    if (!user || !isConnected) {
+      return;
+    }
 
     setLoading(true);
     const favCol = collection(firestore, "users", user.id, "favorites");
@@ -122,7 +137,10 @@ export default function Saved() {
           };
         });
         setFavorites(favs);
+
+        // Salvăm în cache pe user
         try {
+          const CACHE_KEY = CACHE_KEY_PREFIX + user.id;
           await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(favs));
         } catch (e) {
           console.warn("Error saving favorites to cache", e);
@@ -146,13 +164,21 @@ export default function Saved() {
   useFocusEffect(
     useCallback(() => {
       if (!isConnected) {
-        AsyncStorage.getItem(CACHE_KEY)
-          .then((json) => {
-            if (json) setFavorites(JSON.parse(json));
-          })
-          .catch((e) => console.warn("Eroare la reload cache pe focus:", e));
+        // dacă suntem offline, reluăm direct din cache
+        (async () => {
+          try {
+            if (!user) return;
+            const CACHE_KEY = CACHE_KEY_PREFIX + user.id;
+            const raw = await AsyncStorage.getItem(CACHE_KEY);
+            if (raw) {
+              setFavorites(JSON.parse(raw));
+            }
+          } catch (e) {
+            console.warn("Eroare la reload cache pe focus:", e);
+          }
+        })();
       }
-    }, [isConnected]),
+    }, [isConnected, user]),
   );
 
   // --- Filtered favorites ---
@@ -194,6 +220,7 @@ export default function Saved() {
       const newFavorites = favorites.filter((t) => t.id !== team.id);
       setFavorites(newFavorites);
       try {
+        const CACHE_KEY = CACHE_KEY_PREFIX + user.id;
         await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(newFavorites));
       } catch (e) {
         console.warn("Error saving updated favorites to cache:", e);
