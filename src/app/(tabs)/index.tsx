@@ -77,25 +77,6 @@ export default function TeamsScreen() {
     // Dacă `pushRequestedRef.current[user.id]` este deja true, nu mai cer tokenul.
   }, [user, isConnected]);
 
-  // --- 3) Cerem token-ul Expo Push și salvăm în Firestore, doar dacă avem user și internet ---
-  useEffect(() => {
-    if (!user || !isConnected) return;
-
-    registerForPushNotificationsAsync()
-      .then(async (token) => {
-        try {
-          const userRef = doc(firestore, "users", user.id);
-          await updateDoc(userRef, { expoPushToken: token });
-        } catch (firestoreError) {
-          console.warn("Nu s-a putut actualiza expoPushToken:", firestoreError);
-        }
-      })
-      .catch((err) => {
-        console.warn("Eroare la înregistrarea notificărilor push:", err);
-      });
-  }, [user, isConnected]);
-
-  // --- 4) La montare: încărcăm favoritele din cache (chiar dacă nu avem user autenticat) ---
   const [favorites, setFavorites] = useState<SectionTeam[]>([]);
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
 
