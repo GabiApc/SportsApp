@@ -122,7 +122,7 @@ export async function sendPushNotification(
  */
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowAlert: false,
     shouldPlaySound: true,
     shouldSetBadge: true,
     shouldShowBanner: true,
