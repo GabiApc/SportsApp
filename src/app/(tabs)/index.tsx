@@ -53,13 +53,10 @@ export default function TeamsScreen() {
     // 1) Cerem permisiunea și token-ul Expo Push
     registerForPushNotificationsAsync()
       .then(async (token) => {
-        console.log("Expo push token:", token);
-
         // 2) Actualizează câmpul expoPushToken în documentul user-ului din Firestore
         try {
           const userRef = doc(firestore, "users", user.id);
           await updateDoc(userRef, { expoPushToken: token });
-          console.log("expoPushToken actualizat în Firestore");
         } catch (firestoreError) {
           console.warn("Nu s-a putut actualiza expoPushToken:", firestoreError);
         }
