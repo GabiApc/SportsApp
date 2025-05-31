@@ -1,4 +1,18 @@
-// src/components/SettingsSection.tsx
+import { Feather } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
+import { useRouter } from "expo-router";
+import { doc, updateDoc } from "firebase/firestore";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from "react-native";
 
 import { firestore } from "@/config/firebase";
 import { useAuth } from "@/context/authContext";
@@ -10,30 +24,8 @@ import ProfileCard from "@/src/components/ProfileCard";
 import { Colors } from "@/src/theme/colors";
 import { typography } from "@/src/theme/typography";
 import { UserType } from "@/types";
-import { Feather } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
-import { doc, updateDoc } from "firebase/firestore";
-import React, { useEffect, useRef, useState } from "react";
 
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from "react-native";
-
-// 1. Importăm API-ul de notificări
-import * as Notifications from "expo-notifications";
-
-/**
- * 2. Definim două variante ale NotificationHandler-ului:
- *    - unul care AFIȘEAZĂ notificările (sunet, banner, badge etc.)
- *    - unul care LE IGNORĂ COMPLET (nu afișează nimic).
- */
+// --- Notification Handlers ---
 const handlerEnableNotifications = {
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -43,7 +35,6 @@ const handlerEnableNotifications = {
     shouldShowList: true,
   }),
 };
-
 const handlerDisableNotifications = {
   handleNotification: async () => ({
     shouldShowAlert: false,
@@ -53,50 +44,50 @@ const handlerDisableNotifications = {
     shouldShowList: false,
   }),
 };
-
-/**
- * 3. La început, o setăm pe cea „activă” indiferent de toggle.
- *    (Ulterior, vom reactualiza handler-ul din componentă.)
- */
 Notifications.setNotificationHandler(handlerDisableNotifications);
 
+// --- Main Component ---
 export default function SettingsSection() {
-  const { user, setUser, updateUserData } = useAuth();
+  // --- Contexts & Hooks ---
+  const { user, setUser, updateUserData, logout } = useAuth();
   const { colorScheme, toggleTheme } = useTheme();
   const isDark = colorScheme === "dark";
   const theme = isDark ? Colors.dark : Colors.light;
   const router = useRouter();
   const USER_KEY = "@cached_user";
 
+  // --- State ---
   const [editVisible, setEditVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  // NOTĂ: inițial punem pe false; vom sincroniza cu permisiunea reală în useEffect
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // --- Refs ---
+  const expoPushTokenRef = useRef<string | null>(null);
+
+  // --- User Info ---
   const name = user?.name ?? "";
   const email = user?.email ?? "";
 
-  // Reținem token-ul doar atâta timp cât este permis:
-  const expoPushTokenRef = useRef<string | null>(null);
-
+  // --- Modal Handlers ---
   const openEdit = () => setEditVisible(true);
   const closeEdit = () => setEditVisible(false);
-  const { logout } = useAuth();
 
+  // --- Save Profile Handler ---
   const handleSave = async (newName: string, newEmail: string) => {
     if (!user) return;
+    setLoading(true);
 
-    // 1) Update context + AsyncStorage local
+    // 1. Update local context & storage
     const updated: UserType = { ...user, name: newName, email: newEmail };
     setUser(updated);
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(updated)).catch(
       console.warn,
     );
-
     setLoading(false);
     closeEdit();
 
-    // 2) Scrie în Firestore dacă e online
+    // 2. Update Firestore
     try {
       const ref = doc(firestore, "users", user.id);
       await updateDoc(ref, { name: newName, email: newEmail });
@@ -107,38 +98,29 @@ export default function SettingsSection() {
       );
     }
 
-    // 3) Reîncarcă useru‐l de pe server (dacă poți)
+    // 3. Reload user from server
     try {
       await updateUserData(user.id);
-    } catch {
-      // ignorăm dacă nu se poate
-    }
+    } catch {}
   };
 
+  // --- Logout Handler ---
   const handleLogout = async () => {
     logout();
-
     setLogoutModalVisible(false);
     router.replace("/(tabs)");
   };
 
-  /**
-   * 4. Când componenta se montează, verificăm dacă avem deja permisiune.
-   *    Dacă da, setNotificationsEnabled(true) și obținem un token.
-   *    În caz contrar, rămâne false și handler-ul va fi cel de „ignore”.
-   */
+  // --- Notification Permission Sync ---
   useEffect(() => {
     (async () => {
       const { status } = await Notifications.getPermissionsAsync();
       if (status === "granted") {
-        // Dacă permisiunea era deja acordată:
         setNotificationsEnabled(true);
         const tokenData = await Notifications.getExpoPushTokenAsync();
         expoPushTokenRef.current = tokenData.data;
-        // Setăm handler-ul corespunzător:
         Notifications.setNotificationHandler(handlerEnableNotifications);
       } else {
-        // Dacă nu suntem granted, lăsăm toggle pe false
         setNotificationsEnabled(false);
         expoPushTokenRef.current = null;
         Notifications.setNotificationHandler(handlerDisableNotifications);
@@ -146,65 +128,35 @@ export default function SettingsSection() {
     })();
   }, []);
 
-  /**
-   * 5. Handler-ul pentru când userul apasă switch-ul „Permite notificări”:
-   *    - Dacă trece ON:
-   *        * cerem permisiunea native (requestPermissionsAsync)
-   *        * dacă e granted => obținem token, setăm handler-ul de SHOW
-   *        * dacă nu, readucem toggle pe false și îi arătăm Alert
-   *
-   *    - Dacă trece OFF:
-   *        * înlocuim handler-ul cu cel de IGNORE (așa nu mai afișăm nimic)
-   *        * ștergem token-ul din memorie (și de la backend, dacă era trimis anterior)
-   */
+  // --- Notification Toggle Handler ---
   const onToggleNotifications = async (value: boolean) => {
-    // Actualizez state-ul imediat (pentru interfață)
     setNotificationsEnabled(value);
 
     if (value) {
-      // 5.a) Dacă userul a dat ON: cer permisiunea
       const { status } = await Notifications.requestPermissionsAsync();
-
       if (status !== "granted") {
-        // dacă userul refuză, revedem starea și arătăm alert
         Alert.alert(
           "Permisiune refuzată",
           "Nu vom putea trimite notificări fără permisiune.",
         );
         setNotificationsEnabled(false);
-
-        // Păstrăm handler‐ul pe IGNORE, ca să nu apară nimic:
         Notifications.setNotificationHandler(handlerDisableNotifications);
         return;
       }
-
-      // Dacă ajungem aici, userul a acceptat (granted)
-      // Obținem tokenul Expo și salvăm în ref sau AsyncStorage/ backend
       try {
         const tokenData = await Notifications.getExpoPushTokenAsync();
         expoPushTokenRef.current = tokenData.data;
-        // Dacă ai un backend, aici ai putea face:
-        //   await fetch("https://exemplu.backend/salveazaToken", { ... , body: JSON.stringify({ token: tokenData.data }) });
       } catch (e) {
         console.warn("Eroare la obținerea Expo Push Token:", e);
       }
-
-      // Setez handler-ul astfel încât să AFIȘEZE notificările:
       Notifications.setNotificationHandler(handlerEnableNotifications);
     } else {
-      // 5.b) Dacă userul a dat OFF:
-      //   * nu mai afișăm notificări (handler Disable)
-      //   * ștergem tokenul (așa nu trimite backend‐ul push uri)
       expoPushTokenRef.current = null;
       Notifications.setNotificationHandler(handlerDisableNotifications);
-
-      // Dacă l-ași salvat anterior pe AsyncStorage sau l-ai trimis la backend,
-      // aici ai șterge/notify backend-ul să nu mai trimită push:
-      //   AsyncStorage.removeItem("@expo_push_token").catch(console.warn);
-      //   await fetch("https://exemplu.backend/stergeToken", { method: "POST", body: JSON.stringify({ token: ... }) });
     }
   };
 
+  // --- Styles ---
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -276,6 +228,7 @@ export default function SettingsSection() {
     },
   });
 
+  // --- Loading State ---
   if (loading) {
     return (
       <View style={[styles.loader, { backgroundColor: theme.background }]}>
@@ -284,9 +237,10 @@ export default function SettingsSection() {
     );
   }
 
+  // --- Render ---
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Modal confirmare logout */}
+      {/* Logout Confirmation Modal */}
       <ConfirmationModal
         visible={logoutModalVisible}
         title="Ești sigur că vrei să te deloghezi?"
@@ -296,7 +250,7 @@ export default function SettingsSection() {
         onCancel={handleLogout}
       />
 
-      {/* Modal edit profil */}
+      {/* Edit Profile Modal */}
       <EditUserModal
         visible={editVisible}
         initialName={name}
@@ -305,7 +259,7 @@ export default function SettingsSection() {
         onCancel={closeEdit}
       />
 
-      {/* Header (cu buton logout) */}
+      {/* Header */}
       <Header
         onProfilePress={() => setLogoutModalVisible(true)}
         showSearch={false}
@@ -314,16 +268,16 @@ export default function SettingsSection() {
         buttonStyle={{ backgroundColor: "transparent" }}
       />
 
-      {/* Card profil */}
+      {/* Profile Card */}
       {user && <ProfileCard name={name} email={email} onEditPress={openEdit} />}
 
-      {/* Secțiunea de setări */}
+      {/* Settings Section */}
       <View style={styles.settings}>
         <Text style={[styles.header, { color: theme.onBackground }]}>
           Setările aplicației
         </Text>
 
-        {/* Dark Mode */}
+        {/* Dark Mode Toggle */}
         <View style={styles.row}>
           <View
             style={[
@@ -336,13 +290,12 @@ export default function SettingsSection() {
           <Text style={[styles.label, { color: theme.onBackground }]}>
             Mod întunecat
           </Text>
-
           {Platform.OS === "ios" ? (
             <Switch
               value={isDark}
               onValueChange={toggleTheme}
               trackColor={{ false: theme.borderDark, true: theme.primary }}
-              thumbColor={isDark ? theme.onSurface : theme.onSurface}
+              thumbColor={theme.onSurface}
             />
           ) : (
             <View style={styles.toggle}>
@@ -350,13 +303,13 @@ export default function SettingsSection() {
                 value={isDark}
                 onValueChange={toggleTheme}
                 trackColor={{ false: theme.borderDark, true: theme.primary }}
-                thumbColor={isDark ? theme.onSurface : theme.onSurface}
+                thumbColor={theme.onSurface}
               />
             </View>
           )}
         </View>
 
-        {/* Push Notifications */}
+        {/* Push Notifications Toggle */}
         {user && (
           <View style={styles.row}>
             <View
@@ -370,7 +323,6 @@ export default function SettingsSection() {
             <Text style={[styles.label, { color: theme.onBackground }]}>
               Permite notificări
             </Text>
-
             {Platform.OS === "ios" ? (
               <Switch
                 value={notificationsEnabled}
@@ -379,9 +331,7 @@ export default function SettingsSection() {
                   false: theme.textSecondary,
                   true: theme.primary,
                 }}
-                thumbColor={
-                  notificationsEnabled ? theme.onSurface : theme.onSurface
-                }
+                thumbColor={theme.onSurface}
               />
             ) : (
               <View style={styles.toggle2}>
@@ -392,9 +342,7 @@ export default function SettingsSection() {
                     false: isDark ? theme.textSecondary : theme.borderDark,
                     true: theme.primary,
                   }}
-                  thumbColor={
-                    notificationsEnabled ? theme.onSurface : theme.onSurface
-                  }
+                  thumbColor={theme.onSurface}
                 />
               </View>
             )}

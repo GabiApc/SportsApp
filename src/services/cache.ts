@@ -48,13 +48,22 @@ export async function prefetchLeagueTable(leagueId: string, season: string) {
 /**
  * Prefetch and cache current user's favorites on app start
  */
+// în loc de constantă FIXĂ, punem prefix și apoi userId
+const FAVORITES_KEY_PREFIX = "@cached_favorites_";
+const FAVORITES_TS_KEY_PREFIX = "@cached_favorites_ts_";
+
 export async function prefetchFavorites(userId: string) {
   const net = await NetInfo.fetch();
   if (!net.isConnected) return;
 
+  const FAVORITES_KEY = FAVORITES_KEY_PREFIX + userId; // ex: "@cached_favorites_ABC"
+  const FAVORITES_TS_KEY = FAVORITES_TS_KEY_PREFIX + userId; // ex: "@cached_favorites_ts_ABC"
+
   const tsStr = await AsyncStorage.getItem(FAVORITES_TS_KEY);
   const now = Date.now();
-  if (tsStr && now - parseInt(tsStr, 10) < FAV_TTL) return;
+  if (tsStr && now - parseInt(tsStr, 10) < FAV_TTL) {
+    return; // încă mai sunt fresh în cache
+  }
 
   try {
     const snap = await getDocs(
@@ -70,16 +79,19 @@ export async function prefetchFavorites(userId: string) {
         favorited: true,
       };
     });
+
+    // Salvăm favoritele în cache sub cheia specifică userului
     await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
     await AsyncStorage.setItem(FAVORITES_TS_KEY, now.toString());
   } catch (e) {
     console.warn("prefetchFavorites failed", e);
   }
 }
-/**
- * Get cached favorites from AsyncStorage (for offline startup)
- */
-export async function getCachedFavorites(): Promise<SectionTeam[]> {
+
+export async function getCachedFavorites(
+  userId: string,
+): Promise<SectionTeam[]> {
+  const FAVORITES_KEY = FAVORITES_KEY_PREFIX + userId;
   try {
     const raw = await AsyncStorage.getItem(FAVORITES_KEY);
     return raw ? JSON.parse(raw) : [];

@@ -1,5 +1,3 @@
-// src/screens/TeamsScreen.tsx
-
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
 import { useFocusEffect } from "@react-navigation/native";
@@ -26,31 +24,34 @@ import {
   TeamsSection,
 } from "@/src/components/TeamSection";
 import { useCachedTeams } from "@/src/hooks/useCachedTeams";
-import { Colors } from "@/src/theme/colors";
-
 import { getCachedFavorites } from "@/src/services/cache";
 import { registerForPushNotificationsAsync } from "@/src/services/notifications";
+import { Colors } from "@/src/theme/colors";
 
-// Folosim același key în AsyncStorage pentru favorite și user
+// --- CONSTANTS & TYPES ---
 const FAVORITES_STORAGE_KEY = "@cached_favorites";
 const USER_STORAGE_KEY = "@cached_user";
+type PendingOp = { id: string; action: "add" | "remove"; team?: SectionTeam };
 
-// Tipul unei operațiuni în așteptare (offline)
-type PendingOp = {
-  id: string;
-  action: "add" | "remove";
-  team?: SectionTeam;
-};
-
+// --- COMPONENT ---
 export default function TeamsScreen() {
+  // --- CONTEXT & HOOKS ---
   const { user, setUser } = useAuth();
   const router = useRouter();
   const { colorScheme } = useTheme();
   const theme = colorScheme === "dark" ? Colors.dark : Colors.light;
   const pushRequestedRef = useRef<Record<string, boolean>>({});
 
-  // 1) Starea de conectivitate la internet
+  // --- STATE ---
   const [isConnected, setIsConnected] = useState(true);
+  const [favorites, setFavorites] = useState<SectionTeam[]>([]);
+  const [favIds, setFavIds] = useState<Set<string>>(new Set());
+  const [pendingOps, setPendingOps] = useState<PendingOp[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [toastVisible, setToastVisible] = useState(false);
+  const [loginModal, setLoginModal] = useState(false);
+
+  // --- EFFECTS: CONNECTIVITY ---
   useEffect(() => {
     const sub = NetInfo.addEventListener((state) =>
       setIsConnected(!!state.isConnected),
@@ -58,29 +59,17 @@ export default function TeamsScreen() {
     return () => sub();
   }, []);
 
-  // 2) Starea pentru lista de favorite + set favorit IDs
-  const [favorites, setFavorites] = useState<SectionTeam[]>([]);
-  const [favIds, setFavIds] = useState<Set<string>>(new Set());
-
-  // 3) Coada de operațiuni „în așteptare” (pentru sincronizare la revenirea online)
-  const [pendingOps, setPendingOps] = useState<PendingOp[]>([]);
-
-  // --- 3.1) La montare: încărcăm coada de operațiuni din AsyncStorage
+  // --- EFFECTS: PENDING OPS STORAGE ---
   useEffect(() => {
     (async () => {
       try {
         const json = await AsyncStorage.getItem("@pending_favorite_ops");
-        if (json) {
-          const ops: PendingOp[] = JSON.parse(json);
-          setPendingOps(ops);
-        }
+        if (json) setPendingOps(JSON.parse(json));
       } catch (e) {
         console.warn("Eroare la încărcarea operațiunilor în așteptare:", e);
       }
     })();
   }, []);
-
-  // --- 3.2) Salvăm coada de operațiuni de fiecare dată când se schimbă
   useEffect(() => {
     AsyncStorage.setItem(
       "@pending_favorite_ops",
@@ -90,47 +79,23 @@ export default function TeamsScreen() {
     );
   }, [pendingOps]);
 
-  // --- 4) Sincronizare pendingOps în Firestore la revenirea online ---
+  // --- EFFECTS: SYNC PENDING OPS ONLINE ---
   useEffect(() => {
     if (!user || !isConnected || pendingOps.length === 0) return;
-
-    const syncPending = async () => {
-      const newPending: PendingOp[] = [];
-      for (const op of pendingOps) {
-        const favDocRef = doc(firestore, "users", user.id, "favorites", op.id);
-        try {
-          if (op.action === "add" && op.team) {
-            await setDoc(favDocRef, {
-              name: op.team.name,
-              logoUri: op.team.logoUri,
-              leagueInfo: op.team.leagueInfo,
-            });
-          } else if (op.action === "remove") {
-            await deleteDoc(favDocRef);
-          }
-        } catch (e) {
-          console.warn(
-            `Eroare la sincronizarea operației ${op.action} pentru ${op.id}:`,
-            e,
-          );
-          newPending.push(op);
-        }
-      }
-      setPendingOps(newPending);
-    };
-
-    syncPending();
+    syncPendingOps();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isConnected, pendingOps]);
 
-  // --- 5) Cerem token push-notifications la primul user/logare online ---
+  // --- EFFECTS: PUSH NOTIFICATIONS ---
   useEffect(() => {
     if (!user || !isConnected) return;
     if (!pushRequestedRef.current[user.id]) {
       registerForPushNotificationsAsync()
         .then(async (token) => {
           try {
-            const userRef = doc(firestore, "users", user.id);
-            await updateDoc(userRef, { expoPushToken: token });
+            await updateDoc(doc(firestore, "users", user.id), {
+              expoPushToken: token,
+            });
             pushRequestedRef.current[user.id] = true;
           } catch (firestoreError) {
             console.warn(
@@ -145,14 +110,12 @@ export default function TeamsScreen() {
     }
   }, [user, isConnected]);
 
-  // --- 6) Dacă user devine null (delogare), golim favorite și pendingOps ---
+  // --- EFFECTS: LOGOUT CLEANUP ---
   useEffect(() => {
     if (!user) {
-      // Atunci când utilizatorul face logout sau nu este logat:
       setFavorites([]);
       setFavIds(new Set());
       setPendingOps([]);
-      // Ștergem lista din AsyncStorage, ca să nu mai reapară după logout:
       AsyncStorage.removeItem(FAVORITES_STORAGE_KEY).catch((e) =>
         console.warn("Eroare la ștergerea favorite din cache după logout:", e),
       );
@@ -162,13 +125,11 @@ export default function TeamsScreen() {
     }
   }, [user]);
 
-  // --- 7) Gestionarea listei de favorite (verificăm și cache-ul de user, altfel nu încărcăm) ---
+  // --- EFFECTS: LOAD FAVORITES FROM CACHE OR USER ---
   useEffect(() => {
     (async () => {
       try {
         let effectiveUser = user;
-
-        // 7.1) Dacă nu avem user în context, încercăm să-l citim din AsyncStorage
         if (!effectiveUser) {
           const storedUserJson = await AsyncStorage.getItem(USER_STORAGE_KEY);
           if (storedUserJson) {
@@ -179,14 +140,8 @@ export default function TeamsScreen() {
             }
           }
         }
-
-        // 7.2) Dacă nu există un user valid (nici în context, nici în cache), nu încărcăm favoritele
-        if (!effectiveUser) {
-          return;
-        }
-
-        // 7.3) Dacă avem user (din context sau din cache), încărcăm lista de favorite din cache
-        const cachedFavs = await getCachedFavorites();
+        if (!effectiveUser) return;
+        const cachedFavs = await getCachedFavorites(effectiveUser.id);
         setFavorites(cachedFavs);
         setFavIds(new Set(cachedFavs.map((t) => t.id)));
       } catch (e) {
@@ -195,17 +150,14 @@ export default function TeamsScreen() {
     })();
   }, [user, setUser]);
 
-  // --- 8) Abonare Firestore la favorites (numai dacă avem user și suntem online) ---
+  // --- EFFECTS: FIRESTORE SUBSCRIPTION ---
   const unsubscribeRef = useRef<() => void>(() => {});
   useEffect(() => {
-    // Dezabonăm orice abonament anterior
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
       unsubscribeRef.current = () => {};
     }
-
     if (!user || !isConnected) return;
-
     const favCol = collection(firestore, "users", user.id, "favorites");
     const unsub = onSnapshot(
       favCol,
@@ -225,8 +177,6 @@ export default function TeamsScreen() {
         });
         setFavIds(ids);
         setFavorites(favs);
-
-        // Salvăm noua listă în cache
         try {
           await AsyncStorage.setItem(
             FAVORITES_STORAGE_KEY,
@@ -240,7 +190,6 @@ export default function TeamsScreen() {
         console.warn("Eroare la sincronizarea favorite Firestore:", error);
       },
     );
-
     unsubscribeRef.current = () => unsub();
     return () => {
       unsub();
@@ -248,7 +197,7 @@ export default function TeamsScreen() {
     };
   }, [user, isConnected]);
 
-  // --- 9) Când ecranul primește focus și suntem offline, reîncărcăm lista din cache ---
+  // --- EFFECTS: RELOAD FAVORITES FROM CACHE ON FOCUS (OFFLINE) ---
   useFocusEffect(
     useCallback(() => {
       if (!isConnected) {
@@ -262,19 +211,13 @@ export default function TeamsScreen() {
           })
           .catch((e) => console.warn("Eroare la reload cache pe focus:", e));
       }
-      // Dacă suntem online, Firestore onSnapshot o să fi actualizat deja.
     }, [isConnected]),
   );
 
-  // --- 10) Obținem lista de echipe din API („popular teams”) ---
+  // --- DATA: TEAMS FROM API ---
   const { teams: apiTeams, loading } = useCachedTeams();
 
-  // --- 11) Search + toast + login modal ---
-  const [searchQuery, setSearchQuery] = useState("");
-  const [toastVisible, setToastVisible] = useState(false);
-  const [loginModal, setLoginModal] = useState(false);
-
-  // --- 12) Pregătim lista de echipe cu flag-ul „favorited” pe baza lui favIds ---
+  // --- DATA: FILTERED TEAMS ---
   const sectionTeams: SectionTeam[] = apiTeams.map((t) => ({
     id: t.idTeam,
     name: t.strTeam,
@@ -286,7 +229,7 @@ export default function TeamsScreen() {
     team.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
   );
 
-  // --- 13) Navigare către pagina de detalii a echipei ---
+  // --- HANDLERS ---
   const onTeamPress = useCallback(
     (team: SectionTeam) =>
       router.push({
@@ -296,27 +239,21 @@ export default function TeamsScreen() {
     [router],
   );
 
-  // --- 14) Toggle favorite (acum cu suport offline global) ---
   const toggleFav = useCallback(
     async (team: SectionTeam) => {
       if (!user) {
         setLoginModal(true);
         return;
       }
-
       const ref = doc(firestore, "users", user.id, "favorites", team.id);
-
-      // Dacă suntem online, comportamentul e ca înainte: direct în Firestore
       if (isConnected) {
         if (favIds.has(team.id)) {
-          // Ștergere online
           try {
             await deleteDoc(ref);
           } catch (e) {
             console.warn("Eroare la ștergerea favorite Firestore:", e);
           }
         } else {
-          // Adăugare online
           try {
             await setDoc(ref, {
               name: team.name,
@@ -330,17 +267,13 @@ export default function TeamsScreen() {
         }
         return;
       }
-
-      // Dacă suntem offline, actualizăm imediat local + AsyncStorage + coada de pendingOps
+      // Offline logic
       if (favIds.has(team.id)) {
-        // Ștergere locală
         const updatedFavs = favorites.filter((t) => t.id !== team.id);
         const updatedIds = new Set(favIds);
         updatedIds.delete(team.id);
         setFavorites(updatedFavs);
         setFavIds(updatedIds);
-
-        // Salvăm noua listă în AsyncStorage
         try {
           await AsyncStorage.setItem(
             FAVORITES_STORAGE_KEY,
@@ -349,11 +282,8 @@ export default function TeamsScreen() {
         } catch (e) {
           console.warn("Eroare la salvarea favorite după ștergere offline:", e);
         }
-
-        // Adăugăm operațiunea de tip "remove" în coadă
         setPendingOps((prev) => [...prev, { id: team.id, action: "remove" }]);
       } else {
-        // Adăugare locală
         const newTeam: SectionTeam = {
           id: team.id,
           name: team.name,
@@ -366,8 +296,6 @@ export default function TeamsScreen() {
         updatedIds.add(team.id);
         setFavorites(updatedFavs);
         setFavIds(updatedIds);
-
-        // Salvăm noua listă în AsyncStorage
         try {
           await AsyncStorage.setItem(
             FAVORITES_STORAGE_KEY,
@@ -376,8 +304,6 @@ export default function TeamsScreen() {
         } catch (e) {
           console.warn("Eroare la salvarea favorite după adăugare offline:", e);
         }
-
-        // Adăugăm operațiunea de tip "add" în coadă
         setPendingOps((prev) => [
           ...prev,
           { id: team.id, action: "add", team: newTeam },
@@ -388,7 +314,7 @@ export default function TeamsScreen() {
     [user, isConnected, favIds, favorites],
   );
 
-  // --- 15) Afișare loading dacă încărcăm datele din API ---
+  // --- RENDER ---
   if (loading) {
     return (
       <View style={styles(theme).loader}>
@@ -396,8 +322,6 @@ export default function TeamsScreen() {
       </View>
     );
   }
-
-  // --- 16) Dacă suntem offline și nu există date API, afișăm mesaj ---
   if (!loading && !isConnected && filteredTeams.length === 0) {
     return (
       <View style={[styles(theme).loader, { padding: 20 }]}>
@@ -408,8 +332,6 @@ export default function TeamsScreen() {
       </View>
     );
   }
-
-  // --- 17) UI-ul paginii propriu-zise ---
   return (
     <View style={styles(theme).container}>
       <Toast
@@ -443,8 +365,35 @@ export default function TeamsScreen() {
       </View>
     </View>
   );
+
+  // --- UTILITIES ---
+  async function syncPendingOps() {
+    const newPending: PendingOp[] = [];
+    for (const op of pendingOps) {
+      const favDocRef = doc(firestore, "users", user!.id, "favorites", op.id);
+      try {
+        if (op.action === "add" && op.team) {
+          await setDoc(favDocRef, {
+            name: op.team.name,
+            logoUri: op.team.logoUri,
+            leagueInfo: op.team.leagueInfo,
+          });
+        } else if (op.action === "remove") {
+          await deleteDoc(favDocRef);
+        }
+      } catch (e) {
+        console.warn(
+          `Eroare la sincronizarea operației ${op.action} pentru ${op.id}:`,
+          e,
+        );
+        newPending.push(op);
+      }
+    }
+    setPendingOps(newPending);
+  }
 }
 
+// --- STYLES ---
 const styles = (theme: typeof Colors.light | typeof Colors.dark) =>
   StyleSheet.create({
     container: {

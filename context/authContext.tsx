@@ -20,12 +20,15 @@ import React, {
   useState,
 } from "react";
 
+// --- Constants ---
 const USER_KEY = "@cached_user";
 const PENDING_KEY = "@pending_user_update";
 const PENDING_SIGNOUT = "@pending_sign_out";
 
+// --- Context ---
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// --- Provider ---
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
@@ -35,7 +38,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   > | null>(null);
   const router = useRouter();
 
-  // 1) Load cached user on startup
+  // --- 1. Load cached user on startup ---
   useEffect(() => {
     (async () => {
       const json = await AsyncStorage.getItem(USER_KEY);
@@ -47,18 +50,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         }
       }
       const pend = await AsyncStorage.getItem(PENDING_KEY);
-      if (pend) {
-        setPendingUpdate(JSON.parse(pend));
-      }
-      // Dacă la închidere a lăsat semnal de logout nerulat, îl luăm în considerare
+      if (pend) setPendingUpdate(JSON.parse(pend));
       const pendSignOut = await AsyncStorage.getItem(PENDING_SIGNOUT);
+      // Dacă la închidere a lăsat semnal de logout nerulat, îl luăm în considerare
       if (pendSignOut === "true") {
         // vom încerca semnalul de logout la revenire online
       }
     })();
   }, []);
 
-  // 2) Listen to Firebase auth state
+  // --- 2. Listen to Firebase auth state ---
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -73,41 +74,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           email: data.email || firebaseUser.email || "",
         };
         setUser(u);
-
         await AsyncStorage.setItem(USER_KEY, JSON.stringify(u));
         router.replace("/(tabs)");
       } else {
         // user signed out → clear from state and cache
         setUser(null);
         await AsyncStorage.removeItem(USER_KEY);
-        // Dacă exista vreo actualizare în așteptare, o putem păstra,
-        // dar nu ne mai interesează după logout
         await AsyncStorage.removeItem(PENDING_KEY);
-        // și semnalul de logout a fost executat local
         await AsyncStorage.removeItem(PENDING_SIGNOUT);
       }
     });
     return () => unsub();
   }, [router]);
 
-  // 3) When connectivity returns, apply any pending update
+  // --- 3. When connectivity returns, apply any pending update ---
   useEffect(() => {
     const sub = NetInfo.addEventListener(async (state) => {
       if (state.isConnected) {
-        // mai întâi: dacă semnalul de logout este în așteptare, îl executăm
+        // 1. Execută logout dacă e în așteptare
         const pendSignOut = await AsyncStorage.getItem(PENDING_SIGNOUT);
         if (pendSignOut === "true") {
           try {
             await firebaseSignOut(auth);
-            // dacă reușește, semnalul dispare
             await AsyncStorage.removeItem(PENDING_SIGNOUT);
           } catch {
             // încă offline sau eroare, păstrăm semnalul
           }
           return;
         }
-
-        // apoi: sincronizare update user data, dacă există
+        // 2. Sincronizează update user data, dacă există
         if (pendingUpdate && user) {
           try {
             const ref = doc(firestore, "users", user.id);
@@ -123,6 +118,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     return () => sub();
   }, [pendingUpdate, user]);
 
+  // --- Auth Actions ---
   const login = async (email: string, password: string) => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -178,17 +174,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  // 4) Logout: curățare imediată locală și semnal pentru logout pe Firebase mai târziu
+  // --- Logout: curățare locală și semnal pentru logout pe Firebase mai târziu ---
   const logout = async () => {
     setUser(null);
     await AsyncStorage.removeItem(USER_KEY);
     await AsyncStorage.removeItem(PENDING_KEY);
-
     try {
       await AsyncStorage.setItem(PENDING_SIGNOUT, "true");
     } catch {}
   };
 
+  // --- Context Value ---
   const contextValue: AuthContextType = {
     user,
     setUser,
@@ -196,7 +192,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     register,
     updateUserData,
     logout,
-    // adaugăm și funcția de logout în context
   };
 
   return (
@@ -204,6 +199,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   );
 };
 
+// --- Hook ---
 export const useAuth = (): AuthContextType => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be inside AuthProvider");
