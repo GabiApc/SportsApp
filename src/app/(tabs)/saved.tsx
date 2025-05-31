@@ -1,6 +1,8 @@
 // src/screens/Saved.tsx
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
+import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { collection, deleteDoc, doc, onSnapshot } from "firebase/firestore";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -44,9 +46,8 @@ export default function Saved() {
     },
   });
 
-  // Starea de conectivitate la internet
+  // 1) Starea de conectivitate
   const [isConnected, setIsConnected] = useState(true);
-
   useEffect(() => {
     const sub = NetInfo.addEventListener((state) =>
       setIsConnected(!!state.isConnected),
@@ -54,7 +55,7 @@ export default function Saved() {
     return () => sub();
   }, []);
 
-  // Starea pentru favorite și încărcare
+  // 2) Starea favorite + încărcare
   const [favorites, setFavorites] = useState<SectionTeam[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -62,25 +63,35 @@ export default function Saved() {
   // Ref pentru unsubscribe Firestore
   const unsubscribeRef = useRef<() => void>(() => {});
 
-  // 1) La montare: încarcă user-ul din cache (dacă nu există în context) și favoritele din cache
+  /**
+   * 3) La montare (sau la schimbarea lui `user`):
+   *    - Dacă nu există `user` în context, încercăm să-l citim din AsyncStorage.
+   *    - Încărcăm lista de favorite din CACHE_KEY.
+   */
   useEffect(() => {
     (async () => {
       try {
-        // Dacă nu exista un user în context, încercăm să-l citim din AsyncStorage
-        if (!user) {
-          const storedUser = await AsyncStorage.getItem(USER_KEY);
-          if (storedUser) {
-            const parsedUser = JSON.parse(storedUser);
+        let effectiveUser = user;
+
+        // 3.1) Dacă nu există user în context, încercăm să-l luăm din AsyncStorage
+        if (!effectiveUser) {
+          const storedUserJson = await AsyncStorage.getItem(USER_KEY);
+          if (storedUserJson) {
+            const parsedUser = JSON.parse(storedUserJson);
             if (parsedUser && parsedUser.id) {
-              setUser(parsedUser.id);
+              setUser(parsedUser);
+              effectiveUser = parsedUser;
             }
           }
         }
-        // Încărcăm favoritele din cache
+
+        // 3.2) Încarcăm lista de favorite din cache (CACHE_KEY)
         const cachedFavsJson = await AsyncStorage.getItem(CACHE_KEY);
         if (cachedFavsJson) {
           const cachedFavs = JSON.parse(cachedFavsJson) as SectionTeam[];
           setFavorites(cachedFavs);
+        } else {
+          setFavorites([]);
         }
       } catch (e) {
         console.warn("Error loading cached user/favorites:", e);
@@ -90,7 +101,11 @@ export default function Saved() {
     })();
   }, [user, setUser]);
 
-  // 2) Când există user și suntem online, abonăm la Firestore pentru a actualiza favoritele
+  /**
+   * 4) Când există user și suntem online, ne abonăm la Firestore pentru a actualiza lista de favorite.
+   *    Salvăm întotdeauna snapshot-ul în CACHE_KEY, pentru a păstra sincronizare
+   *    chiar și după închiderea aplicației.
+   */
   useEffect(() => {
     // Dezabonăm orice abonament anterior
     if (unsubscribeRef.current) {
@@ -99,7 +114,6 @@ export default function Saved() {
     }
 
     if (!user || !isConnected) {
-      // Dacă nu avem user în context sau suntem offline, nu ne abonăm
       return;
     }
 
@@ -135,19 +149,37 @@ export default function Saved() {
     );
 
     unsubscribeRef.current = () => unsub();
-
     return () => {
       unsub();
       unsubscribeRef.current = () => {};
     };
   }, [user, isConnected]);
 
-  // 3) Filtrare favorite după searchQuery
+  /**
+   * 5) Când ecranul primește focus și suntem offline, reîncărcăm lista de favorite din cache
+   *    (pentru a reflecta modificări făcute în alt ecran în modul offline).
+   */
+  useFocusEffect(
+    useCallback(() => {
+      if (!isConnected) {
+        AsyncStorage.getItem(CACHE_KEY)
+          .then((json) => {
+            if (json) {
+              const cached: SectionTeam[] = JSON.parse(json);
+              setFavorites(cached);
+            }
+          })
+          .catch((e) => console.warn("Eroare la reload cache pe focus:", e));
+      }
+    }, [isConnected]),
+  );
+
+  // 6) Filtrare favorite după searchQuery
   const filtered = favorites.filter((t) =>
     t.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
   );
 
-  // 4) Navigare la detaliile unei echipe
+  // 7) Navigare la detaliile unei echipe
   const onTeamPress = useCallback(
     (team: SectionTeam) => {
       router.push({
@@ -158,27 +190,50 @@ export default function Saved() {
     [router],
   );
 
-  // 5) Toggle favorite (șterge din Firestore când suntem online și user există)
+  /**
+   * 8) Toggle favorite:
+   *    - Dacă suntem online, ștergem din Firestore (și Firestore onSnapshot va actualiza cache-ul).
+   *    - Dacă suntem offline, ștergem doar din cache și actualizăm starea locală.
+   */
   const toggleFav = useCallback(
     async (team: SectionTeam) => {
       if (!user) {
         Alert.alert("Autentificare necesară", "Te rugăm să te loghezi.");
         return;
       }
-      if (!isConnected) {
-        Alert.alert("Offline", "Nu poți modifica favoritele în modul offline.");
+
+      // Dacă suntem online, ștergem direct din Firestore
+      if (isConnected) {
+        try {
+          await deleteDoc(
+            doc(firestore, "users", user.id, "favorites", team.id),
+          );
+          // onSnapshot Firestore va actualiza automat cache-ul
+        } catch (e) {
+          console.warn("Error deleting favorite from Firestore:", e);
+          Alert.alert(
+            "Eroare",
+            "Nu s-a putut șterge din server. Încearcă din nou.",
+          );
+        }
         return;
       }
+
+      // Dacă suntem offline, ștergem doar local
+      const newFavorites = favorites.filter((t) => t.id !== team.id);
+      setFavorites(newFavorites);
+
+      // Rescriem în AsyncStorage
       try {
-        await deleteDoc(doc(firestore, "users", user.id, "favorites", team.id));
+        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(newFavorites));
       } catch (e) {
-        console.warn("Error deleting favorite:", e);
+        console.warn("Error saving updated favorites to cache:", e);
       }
     },
-    [user, isConnected],
+    [user, isConnected, favorites],
   );
 
-  // 6) Afișare loading
+  // 9) Afișare loading
   if (loading) {
     return (
       <View style={styles.loader}>
@@ -187,7 +242,7 @@ export default function Saved() {
     );
   }
 
-  // 7) UI final
+  // 10) UI final
   return (
     <View style={styles.container}>
       <Header
@@ -200,14 +255,14 @@ export default function Saved() {
 
       <View style={styles.section}>
         {!user ? (
-          // Dacă nu există user în context și nu am reușit să citim din cache
+          // Dacă nu există user (nici în context, nici în cache), mesaj
           <View style={styles.messageContainer}>
             <Text style={styles.messageText}>
               Trebuie să fii logat ca să vezi favoritele.
             </Text>
           </View>
         ) : filtered.length === 0 ? (
-          // Dacă există user, dar lista filtrată e goală
+          // Dacă există user, dar nicio echipă în favorite
           <View style={styles.messageContainer}>
             <Text style={styles.messageText}>
               Nu ai echipe în lista de favorite.

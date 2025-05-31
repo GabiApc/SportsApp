@@ -1,6 +1,6 @@
 // src/components/SettingsSection.tsx
 
-import { auth, firestore } from "@/config/firebase";
+import { firestore } from "@/config/firebase";
 import { useAuth } from "@/context/authContext";
 import { useTheme } from "@/context/ThemeContext";
 import { ConfirmationModal } from "@/src/components/ConfirmationModal";
@@ -13,7 +13,6 @@ import { UserType } from "@/types";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { signOut } from "firebase/auth";
 import { doc, updateDoc } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from "react";
 
@@ -82,6 +81,7 @@ export default function SettingsSection() {
 
   const openEdit = () => setEditVisible(true);
   const closeEdit = () => setEditVisible(false);
+  const { logout } = useAuth();
 
   const handleSave = async (newName: string, newEmail: string) => {
     if (!user) return;
@@ -116,7 +116,8 @@ export default function SettingsSection() {
   };
 
   const handleLogout = async () => {
-    await signOut(auth);
+    logout();
+
     setLogoutModalVisible(false);
     router.replace("/(tabs)");
   };
