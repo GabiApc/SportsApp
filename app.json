@@ -17,7 +17,7 @@
         "backgroundColor": "#FF5050"
       },
       "googleServicesFile": "./google-services.json",
-      "package": "com.gabiapg.SportsApp"
+      "package": "com.ionelabocoiu.SportsApp"
     },
     "web": {
       "bundler": "metro",
@@ -42,7 +42,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "a80d154f-6b28-411a-bd82-877348cb10f5"
+        "projectId": "d1a5b0d7-8748-4cbd-b3e8-443b91498304"
       }
     }
   }

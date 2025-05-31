@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:997288060693:android:3b7d8070197c0c7cb22b1c",
+        "mobilesdk_app_id": "1:997288060693:android:203621ba89d75243b22b1c",
         "android_client_info": {
-          "package_name": "com.gabiapg.SportsApp"
+          "package_name": "com.ionelabocoiu.SportsApp"
         }
       },
       "oauth_client": [],
