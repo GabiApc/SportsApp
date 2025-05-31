@@ -8,6 +8,7 @@ import {
   doc,
   onSnapshot,
   setDoc,
+  updateDoc,
 } from "firebase/firestore";
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
@@ -44,12 +45,30 @@ export default function TeamsScreen() {
     );
     return () => sub();
   }, []);
+
   useEffect(() => {
+    // Dacă nu e niciun user, nu cerem token acum
+    if (!user) return;
+
+    // 1) Cerem permisiunea și token-ul Expo Push
     registerForPushNotificationsAsync()
-      .then(setExpoPushToken)
-      .catch(console.warn);
-    // Adaugă listener-ele notif, etc.
-  }, []);
+      .then(async (token) => {
+        console.log("Expo push token:", token);
+
+        // 2) Actualizează câmpul expoPushToken în documentul user-ului din Firestore
+        try {
+          const userRef = doc(firestore, "users", user.id);
+          await updateDoc(userRef, { expoPushToken: token });
+          console.log("expoPushToken actualizat în Firestore");
+        } catch (firestoreError) {
+          console.warn("Nu s-a putut actualiza expoPushToken:", firestoreError);
+        }
+      })
+      .catch((err) => {
+        console.warn("Eroare la înregistrarea notificărilor push:", err);
+      });
+  }, [user]);
+
   // popular teams
   const { teams: apiTeams, loading } = useCachedTeams();
 
@@ -226,8 +245,3 @@ const styles = (theme: typeof Colors.light | typeof Colors.dark) =>
       alignItems: "center",
     },
   });
-function setExpoPushToken(token: string) {
-  // Optionally, you could store the token in state, context, or send it to your backend.
-  // For now, just log it for debugging.
-  console.log("Expo push token:", token);
-}
