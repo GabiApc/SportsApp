@@ -1,4 +1,5 @@
 // src/screens/TeamsScreen.tsx
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
 import { useRouter } from "expo-router";
@@ -10,7 +11,7 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 import { firestore } from "@/config/firebase";
@@ -30,30 +31,58 @@ import { getCachedFavorites } from "@/src/services/cache";
 import { registerForPushNotificationsAsync } from "@/src/services/notifications";
 
 const FAVORITES_STORAGE_KEY = "@cached_favorites";
+const USER_STORAGE_KEY = "@cached_user"; // cheia sub care păstrăm user-ul în AsyncStorage
 
 export default function TeamsScreen() {
   const { user, setUser } = useAuth();
   const router = useRouter();
   const { colorScheme } = useTheme();
   const theme = colorScheme === "dark" ? Colors.dark : Colors.light;
+  const pushRequestedRef = useRef<Record<string, boolean>>({});
 
-  // connectivity
+  // --- 1) Starea de conectivitate la internet ---
   const [isConnected, setIsConnected] = useState(true);
   useEffect(() => {
-    const sub = NetInfo.addEventListener((s) =>
-      setIsConnected(!!s.isConnected),
+    const sub = NetInfo.addEventListener((state) =>
+      setIsConnected(!!state.isConnected),
     );
     return () => sub();
   }, []);
 
   useEffect(() => {
-    // Dacă nu e niciun user, nu cerem token acum
-    if (!user) return;
+    // Dacă nu există user sau nu suntem conectați, nu facem nimic.
+    if (!user || !isConnected) return;
 
-    // 1) Cerem permisiunea și token-ul Expo Push
+    // Dacă pentru acest user.id nu există încă un flag, înseamnă că nu am cerut tokenul:
+    if (!pushRequestedRef.current[user.id]) {
+      // 1) Cerem token-ul doar acum, pentru prima dată pentru acest user.
+      registerForPushNotificationsAsync()
+        .then(async (token) => {
+          try {
+            const userRef = doc(firestore, "users", user.id);
+            await updateDoc(userRef, { expoPushToken: token });
+            // După ce am actualizat cu succes, marchez flag-ul ca „true”
+            pushRequestedRef.current[user.id] = true;
+          } catch (firestoreError) {
+            console.warn(
+              "Nu s-a putut actualiza expoPushToken:",
+              firestoreError,
+            );
+          }
+        })
+        .catch((err) => {
+          console.warn("Eroare la înregistrarea notificărilor push:", err);
+        });
+    }
+    // Dacă `pushRequestedRef.current[user.id]` este deja true, nu mai cer tokenul.
+  }, [user, isConnected]);
+
+  // --- 3) Cerem token-ul Expo Push și salvăm în Firestore, doar dacă avem user și internet ---
+  useEffect(() => {
+    if (!user || !isConnected) return;
+
     registerForPushNotificationsAsync()
       .then(async (token) => {
-        // 2) Actualizează câmpul expoPushToken în documentul user-ului din Firestore
         try {
           const userRef = doc(firestore, "users", user.id);
           await updateDoc(userRef, { expoPushToken: token });
@@ -64,68 +93,98 @@ export default function TeamsScreen() {
       .catch((err) => {
         console.warn("Eroare la înregistrarea notificărilor push:", err);
       });
-  }, [user]);
+  }, [user, isConnected]);
 
-  // popular teams
-  const { teams: apiTeams, loading } = useCachedTeams();
-
-  // search + toast + login modal
-  const [searchQuery, setSearchQuery] = useState("");
-  const [toastVisible, setToastVisible] = useState(false);
-  const [loginModal, setLoginModal] = useState(false);
-
-  // favorites state + ids
+  // --- 4) La montare: încărcăm favoritele din cache (chiar dacă nu avem user autenticat) ---
   const [favorites, setFavorites] = useState<SectionTeam[]>([]);
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
 
-  // 1) load cached favorites on mount
   useEffect(() => {
-    if (!user) return;
     (async () => {
-      const cached = await getCachedFavorites();
-      setFavorites(cached);
-      setFavIds(new Set(cached.map((t) => t.id)));
+      try {
+        const cachedFavs = await getCachedFavorites();
+        setFavorites(cachedFavs);
+        setFavIds(new Set(cachedFavs.map((t) => t.id)));
+      } catch (e) {
+        console.warn("Eroare la încărcarea favorite din cache:", e);
+      }
     })();
-  }, [user]);
+  }, []);
 
-  // 2) subscribe to Firestore favorites live
+  // --- 5) Abonare la Firestore favorites, doar dacă avem user și internet ---
+  const unsubscribeRef = useRef<() => void>(() => {});
+
   useEffect(() => {
-    if (!user) {
-      setFavorites([]);
-      setFavIds(new Set());
+    // Dacă există un abonament anterior, îl dezabonăm
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = () => {};
+    }
+
+    if (!user || !isConnected) {
+      // Dacă nu avem user sau suntem offline, nu ne abonăm.
       return;
     }
 
     const favCol = collection(firestore, "users", user.id, "favorites");
-    const unsub = onSnapshot(favCol, (snap) => {
-      const ids = new Set<string>();
-      const favs: SectionTeam[] = [];
-      snap.forEach((d) => {
-        ids.add(d.id);
-        const data = d.data() as any;
-        favs.push({
-          id: d.id,
-          name: data.name,
-          logoUri: data.logoUri,
-          leagueInfo: data.leagueInfo ?? "",
-          favorited: true,
+    const unsub = onSnapshot(
+      favCol,
+      (snap) => {
+        const ids = new Set<string>();
+        const favs: SectionTeam[] = [];
+        snap.forEach((d) => {
+          ids.add(d.id);
+          const data = d.data() as any;
+          favs.push({
+            id: d.id,
+            name: data.name,
+            logoUri: data.logoUri,
+            leagueInfo: data.leagueInfo ?? "",
+            favorited: true,
+          });
         });
-      });
-      setFavIds(ids);
-      setFavorites(favs);
-    });
-    return () => unsub();
-  }, [user]);
+        setFavIds(ids);
+        setFavorites(favs);
+      },
+      (error) => {
+        console.warn("Eroare la sincronizarea favorite Firestore:", error);
+      },
+    );
 
-  // 3) persist whenever favorites change
+    unsubscribeRef.current = () => unsub();
+
+    return () => {
+      unsub();
+      unsubscribeRef.current = () => {};
+    };
+  }, [user, isConnected]);
+
+  // --- 6) Persistăm favorites în cache de fiecare dată când se schimbă favorites ---
   useEffect(() => {
     AsyncStorage.setItem(
       FAVORITES_STORAGE_KEY,
       JSON.stringify(favorites),
-    ).catch(console.warn);
+    ).catch((e) => console.warn("Eroare la salvarea favorite în cache:", e));
   }, [favorites]);
 
-  // map & filter
+  // --- 7) Persistăm user în cache (dacă apare sau se schimbă), ca să-l putem folosi offline ---
+  useEffect(() => {
+    if (user) {
+      AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user)).catch((e) =>
+        console.warn("Eroare la salvarea user-ului în cache:", e),
+      );
+    }
+  }, [user]);
+
+  // --- 8) Obținem lista de echipe din API („popular teams”) ---
+  const { teams: apiTeams, loading } = useCachedTeams();
+
+  // --- 9) Search + toast + login modal ---
+  const [searchQuery, setSearchQuery] = useState("");
+  const [toastVisible, setToastVisible] = useState(false);
+  const [loginModal, setLoginModal] = useState(false);
+
+  // --- 10) Pregătim lista de echipe cu flag-ul „favorited” bazat pe favIds ---
   const sectionTeams: SectionTeam[] = apiTeams.map((t) => ({
     id: t.idTeam,
     name: t.strTeam,
@@ -137,7 +196,7 @@ export default function TeamsScreen() {
     team.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
   );
 
-  // navigation
+  // --- 11) Navigare către pagina de detalii a echipei ---
   const onTeamPress = useCallback(
     (team: SectionTeam) =>
       router.push({
@@ -147,7 +206,7 @@ export default function TeamsScreen() {
     [router],
   );
 
-  // toggle favorite
+  // --- 12) Toggle favorită (online, dacă avem user) ---
   const toggleFav = useCallback(
     async (team: SectionTeam) => {
       if (!user) {
@@ -169,6 +228,7 @@ export default function TeamsScreen() {
     [favIds, user],
   );
 
+  // --- 13) Afișare loading dacă încărcăm datele din API ---
   if (loading) {
     return (
       <View style={styles(theme).loader}>
@@ -177,18 +237,19 @@ export default function TeamsScreen() {
     );
   }
 
-  // first-run offline + no data
+  // --- 14) Dacă suntem offline și nu există date în cache de echipe/filter, afișăm un mesaj de eroare ---
   if (!loading && !isConnected && filteredTeams.length === 0) {
     return (
       <View style={[styles(theme).loader, { padding: 20 }]}>
         <Text style={{ color: theme.textSecondary, textAlign: "center" }}>
-          Nu ai internet și nu există date în cache.{"\n"}
-          Verifică-ți conexiunea și reîncarcă aplicația.
+          Nu ai internet și nu există date în cache.{"\n"}Verifică-ți conexiunea
+          și reîncarcă aplicația.
         </Text>
       </View>
     );
   }
 
+  // --- 15) UI-ul paginii propriu-zise ---
   return (
     <View style={styles(theme).container}>
       <Toast
